@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AgentFlowWSServer } from '../src/ws/server';
-import { JsonStore } from '../src/store/json-store';
 import WebSocket from 'ws';
 import fs from 'fs';
 import path from 'path';
@@ -9,7 +8,6 @@ const TEST_FILE = path.join(__dirname, 'test-data', 'ws-events.json');
 
 describe('AgentFlowWSServer', () => {
   let wsServer: AgentFlowWSServer;
-  let store: JsonStore;
   const PORT = 9999;
 
   beforeEach(async () => {
@@ -20,8 +18,7 @@ describe('AgentFlowWSServer', () => {
     if (fs.existsSync(TEST_FILE)) {
       fs.rmSync(TEST_FILE);
     }
-    store = new JsonStore(TEST_FILE);
-    wsServer = new AgentFlowWSServer(store, PORT, 1000);
+    wsServer = new AgentFlowWSServer(PORT, 1000);
     await wsServer.start();
   });
 
@@ -54,8 +51,8 @@ describe('AgentFlowWSServer', () => {
         }
       });
 
-      client.on('open', async () => {
-        await store.addEvent({
+      client.on('open', () => {
+        wsServer.broadcast({
           id: 'evt-1',
           sessionId: 's1',
           type: 'start',

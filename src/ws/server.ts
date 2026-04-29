@@ -3,53 +3,61 @@ import type { EventStore, AgentEvent, WSMessage } from '../types';
 
 export class AgentFlowWSServer {
   private wss: WebSocketServer | null = null;
-  private store: EventStore;
   private port: number;
   private heartbeatIntervalMs: number;
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  private onEventCallback?: (event: AgentEvent) => void;
 
-  constructor(store: EventStore, port: number, heartbeatIntervalMs = 30000) {
-    this.store = store;
+  constructor(port: number, heartbeatIntervalMs = 30000) {
     this.port = port;
     this.heartbeatIntervalMs = heartbeatIntervalMs;
+  }
 
-    // Wrap store.addEvent to broadcast after each event is persisted
-    const originalAddEvent = store.addEvent.bind(store);
-    store.addEvent = async (event: AgentEvent): Promise<void> => {
-      await originalAddEvent(event);
-      this.broadcast(event);
-    };
+  setEventCallback(callback: (event: AgentEvent) => void): void {
+    this.onEventCallback = callback;
   }
 
   async start(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       this.wss = new WebSocketServer({ port: this.port });
 
       this.wss.on('connection', (ws) => {
         this.handleConnection(ws);
       });
 
+      this.wss.on('error', (err) => {
+        console.error('WebSocket server error:', err);
+        reject(err);
+      });
+
       this.wss.on('listening', () => {
         console.log(`WebSocket server started on port ${this.port}`);
         resolve();
+        this.startHeartbeat();
       });
-
-      this.startHeartbeat();
     });
   }
 
   async stop(): Promise<void> {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
     }
     if (this.wss) {
-      this.wss.close();
+      await new Promise<void>((resolve) => {
+        this.wss!.close(() => resolve());
+      });
+      this.wss = null;
     }
   }
 
   private handleConnection(ws: WebSocket): void {
     ws.on('message', (data) => {
       this.handleMessage(ws, data.toString());
+    });
+
+    ws.on('error', (err) => {
+      console.error('WebSocket client error:', err);
     });
 
     ws.on('close', () => {
