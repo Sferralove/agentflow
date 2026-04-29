@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import express from 'express';
 import { AgentFlowServer } from '../server';
+import { createAPIRouter } from '../api/routes';
 
 export function serveCommand(program: Command): void {
   program
@@ -23,27 +24,25 @@ export function serveCommand(program: Command): void {
       }
 
       const server = new AgentFlowServer(dataDir, wsPort);
+      const store = server.getStore();
 
-      // Start Express for frontend
       const app = express();
-      const frontendDist = path.join(__dirname, '../../frontend/dist');
+      app.use(createAPIRouter(store));
 
+      const frontendDist = path.join(__dirname, '../../frontend/dist');
       if (fs.existsSync(frontendDist)) {
         app.use(express.static(frontendDist));
       }
-
-      app.get('/api/sessions', async (_req: any, res: any) => {
-        const sessions = await server.getStore().getAllSessions();
-        res.json(sessions);
-      });
 
       app.listen(3000, () => {
         console.log('Dashboard: http://localhost:3000');
       });
 
       await server.startWS();
-      await server.startMCP();
       console.log(`WebSocket: ws://localhost:${wsPort}`);
+      console.log('API: http://localhost:3000/api');
+
+      await server.startMCP();
       console.log('MCP server available via stdio');
 
       const shutdown = async () => {
