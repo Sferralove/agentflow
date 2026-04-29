@@ -13,12 +13,7 @@ export class AgentFlowServer {
     this.store = new JsonStore(storePath);
     this.wsServer = new AgentFlowWSServer(wsPort);
 
-    // Connect store events to WS broadcast via callback
-    this.wsServer.setEventCallback((event: AgentEvent) => {
-      this.wsServer.broadcast(event);
-    });
-
-    // Wrap store.addEvent to trigger WS callback
+    // Wrap store.addEvent to trigger WS broadcast via monkey-patch
     const originalAddEvent = this.store.addEvent.bind(this.store);
     this.store.addEvent = async (event: AgentEvent) => {
       await originalAddEvent(event);
@@ -38,6 +33,7 @@ export class AgentFlowServer {
 
   async stop(): Promise<void> {
     await this.wsServer.stop();
+    await this.mcpServer.stop();
   }
 
   getStore(): JsonStore {

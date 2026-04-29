@@ -11,6 +11,10 @@ export function serveCommand(program: Command): void {
     .option('-p, --port <number>', 'WebSocket port', '3001')
     .action(async (options) => {
       const wsPort = parseInt(options.port, 10);
+      if (isNaN(wsPort)) {
+        console.error('Error: Invalid port number');
+        process.exit(1);
+      }
       const dataDir = path.join(process.cwd(), '.agent-flow', 'data');
 
       if (!fs.existsSync(dataDir)) {
@@ -38,7 +42,16 @@ export function serveCommand(program: Command): void {
       });
 
       await server.startWS();
+      await server.startMCP();
       console.log(`WebSocket: ws://localhost:${wsPort}`);
       console.log('MCP server available via stdio');
+
+      const shutdown = async () => {
+        console.log('\nShutting down...');
+        await server.stop();
+        process.exit(0);
+      };
+      process.on('SIGINT', shutdown);
+      process.on('SIGTERM', shutdown);
     });
 }

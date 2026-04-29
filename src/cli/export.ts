@@ -24,9 +24,22 @@ export function exportCommand(program: Command): void {
       );
 
       if (options.format === 'csv') {
+        const escapeCsv = (val: string | number | undefined) => {
+          if (val === undefined || val === null) return '';
+          const s = String(val);
+          if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+            return `"${s.replace(/"/g, '""')}"`;
+          }
+          return s;
+        };
         const headers = 'id,sessionId,type,agent,targetAgent,timestamp\n';
         const rows = events
-          .map((e) => `${e.id},${e.sessionId},${e.type},${e.agent},${e.targetAgent || ''},${e.timestamp}`)
+          .map(
+            (e) =>
+              [e.id, e.sessionId, e.type, e.agent, e.targetAgent || '', e.timestamp]
+                .map(escapeCsv)
+                .join(','),
+          )
           .join('\n');
         console.log(headers + rows);
       } else {
