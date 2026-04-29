@@ -3,11 +3,14 @@
   "version": "0.1.0",
   "description": "Agent/Subagent flow monitoring tool for OpenCode",
   "main": "dist/server.js",
+  "files": [
+    "dist/"
+  ],
   "bin": {
     "agent-flow": "dist/cli/index.js"
   },
   "scripts": {
-    "build": "tsc && (cd frontend && npm run build || true)",
+    "build": "tsc && (cd frontend && npm run build || true) && mkdir -p dist/public && cp -r frontend/dist/* dist/public/",
     "build:frontend": "cd frontend && npm run build",
     "dev": "tsc --watch",
     "test": "vitest run",

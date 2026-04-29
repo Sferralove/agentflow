@@ -29,9 +29,11 @@ export function serveCommand(program: Command): void {
       const app = express();
       app.use(createAPIRouter(store));
 
-      const frontendDist = path.join(__dirname, '../../frontend/dist');
+      const frontendDist = path.join(__dirname, '../public');
       if (fs.existsSync(frontendDist)) {
         app.use(express.static(frontendDist));
+      } else {
+        console.log('Warning: Frontend not found. Dashboard unavailable.');
       }
 
       app.listen(3000, () => {
