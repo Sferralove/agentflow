@@ -35,4 +35,9 @@ export class AgentFlowMCPServer {
     await this.server.connect(transport);
     console.error('Agent Flow MCP server started');
   }
+
+  async stop(): Promise<void> {
+    // StdioServerTransport doesn't have a close method, but we can log
+    console.error('Agent Flow MCP server stopped');
+  }
 }

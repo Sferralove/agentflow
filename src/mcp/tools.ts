@@ -1,5 +1,15 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { EventStore, AgentEvent } from '../types';
+import type { EventStore, AgentEvent, EventType } from '../types';
+
+const toolResponse = (data: unknown) => ({
+  content: [{ type: 'text' as const, text: JSON.stringify(data) }],
+});
+
+const errorResponse = (message: string) => ({
+  content: [{ type: 'text' as const, text: JSON.stringify({ error: message }) }],
+});
+
+const VALID_EVENT_TYPES: EventType[] = ['start', 'complete', 'dispatch', 'task', 'error', 'message'];
 
 export function createMCPTools(store: EventStore) {
   return {
@@ -18,21 +28,24 @@ export function createMCPTools(store: EventStore) {
         required: ['type', 'agent', 'sessionId'],
       },
       handler: async (args: { type: string; agent: string; sessionId: string; targetAgent?: string; payload?: Record<string, unknown> }) => {
-        const event: AgentEvent = {
-          id: uuidv4(),
-          sessionId: args.sessionId,
-          type: args.type as AgentEvent['type'],
-          agent: args.agent,
-          targetAgent: args.targetAgent,
-          payload: args.payload || {},
-          timestamp: Date.now(),
-        };
-
-        await store.addEvent(event);
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ success: true, eventId: event.id }) }],
-        };
+        try {
+          if (!VALID_EVENT_TYPES.includes(args.type as EventType)) {
+            return errorResponse(`Invalid event type: ${args.type}`);
+          }
+          const event: AgentEvent = {
+            id: uuidv4(),
+            sessionId: args.sessionId,
+            type: args.type as EventType,
+            agent: args.agent,
+            targetAgent: args.targetAgent,
+            payload: args.payload || {},
+            timestamp: Date.now(),
+          };
+          await store.addEvent(event);
+          return toolResponse({ success: true, eventId: event.id });
+        } catch (err) {
+          return errorResponse(`Failed to add event: ${err instanceof Error ? err.message : String(err)}`);
+        }
       },
     },
 
@@ -50,17 +63,18 @@ export function createMCPTools(store: EventStore) {
         },
       },
       handler: async (args: { agent?: string; type?: string; sessionId?: string; from?: number; to?: number }) => {
-        const events = await store.getEvents({
-          agent: args.agent,
-          type: args.type as AgentEvent['type'],
-          sessionId: args.sessionId,
-          from: args.from,
-          to: args.to,
-        });
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(events) }],
-        };
+        try {
+          const events = await store.getEvents({
+            agent: args.agent,
+            type: args.type as EventType | undefined,
+            sessionId: args.sessionId,
+            from: args.from,
+            to: args.to,
+          });
+          return toolResponse(events);
+        } catch (err) {
+          return errorResponse(`Failed to query events: ${err instanceof Error ? err.message : String(err)}`);
+        }
       },
     },
 
@@ -75,11 +89,12 @@ export function createMCPTools(store: EventStore) {
         required: ['sessionId'],
       },
       handler: async (args: { sessionId: string }) => {
-        const session = await store.getSession(args.sessionId);
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(session) }],
-        };
+        try {
+          const session = await store.getSession(args.sessionId);
+          return toolResponse(session);
+        } catch (err) {
+          return errorResponse(`Failed to get session: ${err instanceof Error ? err.message : String(err)}`);
+        }
       },
     },
 
@@ -94,11 +109,12 @@ export function createMCPTools(store: EventStore) {
         required: ['agentId'],
       },
       handler: async (args: { agentId: string }) => {
-        const agent = await store.getAgentInfo(args.agentId);
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(agent) }],
-        };
+        try {
+          const agent = await store.getAgentInfo(args.agentId);
+          return toolResponse(agent);
+        } catch (err) {
+          return errorResponse(`Failed to get agent info: ${err instanceof Error ? err.message : String(err)}`);
+        }
       },
     },
 
@@ -113,11 +129,12 @@ export function createMCPTools(store: EventStore) {
         required: ['sessionId'],
       },
       handler: async (args: { sessionId: string }) => {
-        const tree = await store.getAgentTree(args.sessionId);
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(tree) }],
-        };
+        try {
+          const tree = await store.getAgentTree(args.sessionId);
+          return toolResponse(tree);
+        } catch (err) {
+          return errorResponse(`Failed to get agent tree: ${err instanceof Error ? err.message : String(err)}`);
+        }
       },
     },
   };
