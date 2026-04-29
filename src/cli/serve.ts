@@ -38,13 +38,7 @@ export function serveCommand(program: Command): void {
         console.log('Dashboard: http://localhost:3000');
       });
 
-      await server.startWS();
-      console.log(`WebSocket: ws://localhost:${wsPort}`);
-      console.log('API: http://localhost:3000/api');
-
-      await server.startMCP();
-      console.log('MCP server available via stdio');
-
+      // Register shutdown handlers before anything blocking
       const shutdown = async () => {
         console.log('\nShutting down...');
         await server.stop();
@@ -52,5 +46,13 @@ export function serveCommand(program: Command): void {
       };
       process.on('SIGINT', shutdown);
       process.on('SIGTERM', shutdown);
+
+      await server.startWS();
+      console.log(`WebSocket: ws://localhost:${wsPort}`);
+      console.log('API: http://localhost:3000/api');
+
+      // Start MCP in background (stdio transport blocks)
+      server.startMCP().catch(console.error);
+      console.log('MCP server available via stdio');
     });
 }

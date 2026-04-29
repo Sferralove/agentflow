@@ -10,7 +10,7 @@ interface DashboardProps {
   onNewEvent: (event: AgentEvent) => void;
 }
 
-export default function Dashboard({ events }: DashboardProps) {
+export default function Dashboard({ events, onNewEvent: _onNewEvent }: DashboardProps) {
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
