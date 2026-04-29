@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
 import type { EventStore, AgentEvent, EventType } from '../types';
 
 const toolResponse = (data: unknown) => ({
@@ -17,15 +18,11 @@ export function createMCPTools(store: EventStore) {
       name: 'send_event' as const,
       description: 'Send an agent event to the flow monitor',
       inputSchema: {
-        type: 'object',
-        properties: {
-          type: { type: 'string', enum: ['start', 'complete', 'dispatch', 'task', 'error', 'message'] },
-          agent: { type: 'string' },
-          sessionId: { type: 'string' },
-          targetAgent: { type: 'string' },
-          payload: { type: 'object' },
-        },
-        required: ['type', 'agent', 'sessionId'],
+        type: z.enum(['start', 'complete', 'dispatch', 'task', 'error', 'message']),
+        agent: z.string(),
+        sessionId: z.string(),
+        targetAgent: z.string().optional(),
+        payload: z.record(z.string(), z.unknown()).optional(),
       },
       handler: async (args: { type: string; agent: string; sessionId: string; targetAgent?: string; payload?: Record<string, unknown> }) => {
         try {
@@ -53,14 +50,11 @@ export function createMCPTools(store: EventStore) {
       name: 'query_events' as const,
       description: 'Query events with optional filters',
       inputSchema: {
-        type: 'object',
-        properties: {
-          agent: { type: 'string' },
-          type: { type: 'string' },
-          sessionId: { type: 'string' },
-          from: { type: 'number' },
-          to: { type: 'number' },
-        },
+        agent: z.string().optional(),
+        type: z.string().optional(),
+        sessionId: z.string().optional(),
+        from: z.number().optional(),
+        to: z.number().optional(),
       },
       handler: async (args: { agent?: string; type?: string; sessionId?: string; from?: number; to?: number }) => {
         try {
@@ -82,11 +76,7 @@ export function createMCPTools(store: EventStore) {
       name: 'get_session' as const,
       description: 'Get complete session data',
       inputSchema: {
-        type: 'object',
-        properties: {
-          sessionId: { type: 'string' },
-        },
-        required: ['sessionId'],
+        sessionId: z.string(),
       },
       handler: async (args: { sessionId: string }) => {
         try {
@@ -102,11 +92,7 @@ export function createMCPTools(store: EventStore) {
       name: 'get_agent_info' as const,
       description: 'Get agent metadata',
       inputSchema: {
-        type: 'object',
-        properties: {
-          agentId: { type: 'string' },
-        },
-        required: ['agentId'],
+        agentId: z.string(),
       },
       handler: async (args: { agentId: string }) => {
         try {
@@ -122,11 +108,7 @@ export function createMCPTools(store: EventStore) {
       name: 'get_agent_tree' as const,
       description: 'Get agent hierarchy for a session',
       inputSchema: {
-        type: 'object',
-        properties: {
-          sessionId: { type: 'string' },
-        },
-        required: ['sessionId'],
+        sessionId: z.string(),
       },
       handler: async (args: { sessionId: string }) => {
         try {

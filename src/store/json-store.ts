@@ -129,11 +129,11 @@ export class JsonStore implements EventStore {
       if (filter.sessionId) {
         result = result.filter(e => e.sessionId === filter.sessionId);
       }
-      if (filter.from) {
-        result = result.filter(e => e.timestamp >= filter.from);
+      if (filter.from !== undefined) {
+        result = result.filter(e => e.timestamp >= filter.from!);
       }
-      if (filter.to) {
-        result = result.filter(e => e.timestamp <= filter.to);
+      if (filter.to !== undefined) {
+        result = result.filter(e => e.timestamp <= filter.to!);
       }
     }
 
