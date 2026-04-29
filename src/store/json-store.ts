@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import type { AgentEvent, AgentInfo, AgentNode, EventFilter, EventStore, SessionData } from '../types';
 
 export class JsonStore implements EventStore {
@@ -26,7 +27,7 @@ export class JsonStore implements EventStore {
   }
 
   private async save(): Promise<void> {
-    const dir = this.filePath.substring(0, this.filePath.lastIndexOf('/'));
+    const dir = path.dirname(this.filePath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -34,7 +35,9 @@ export class JsonStore implements EventStore {
       events: this.events,
       agents: Object.fromEntries(this.agents),
     };
-    await fs.promises.writeFile(this.filePath, JSON.stringify(data, null, 2));
+    const tmpPath = this.filePath + '.tmp';
+    await fs.promises.writeFile(tmpPath, JSON.stringify(data, null, 2));
+    await fs.promises.rename(tmpPath, this.filePath);
   }
 
   async addEvent(event: AgentEvent): Promise<void> {
@@ -103,6 +106,13 @@ export class JsonStore implements EventStore {
         agent.status = 'error';
         agent.tasksFailed++;
         break;
+      case 'task':
+      case 'message':
+        // No state change for task/message events
+        break;
+      default:
+        // Unknown event type, ignore
+        break;
     }
   }
 
@@ -120,14 +130,14 @@ export class JsonStore implements EventStore {
         result = result.filter(e => e.sessionId === filter.sessionId);
       }
       if (filter.from) {
-        result = result.filter(e => e.timestamp >= filter.from!);
+        result = result.filter(e => e.timestamp >= filter.from);
       }
       if (filter.to) {
-        result = result.filter(e => e.timestamp <= filter.to!);
+        result = result.filter(e => e.timestamp <= filter.to);
       }
     }
 
-    return result;
+    return [...result];
   }
 
   async getSession(sessionId: string): Promise<SessionData | null> {
