@@ -34,7 +34,7 @@ export class JsonStore implements EventStore {
       events: this.events,
       agents: Object.fromEntries(this.agents),
     };
-    fs.writeFileSync(this.filePath, JSON.stringify(data, null, 2));
+    await fs.promises.writeFile(this.filePath, JSON.stringify(data, null, 2));
   }
 
   async addEvent(event: AgentEvent): Promise<void> {
@@ -50,7 +50,7 @@ export class JsonStore implements EventStore {
       agent = {
         id: event.agent,
         name: event.agent,
-        type: event.targetAgent ? 'subagent' : 'main',
+        type: 'main' as const,
         children: [],
         capabilities: [],
         status: 'idle',
@@ -77,8 +77,23 @@ export class JsonStore implements EventStore {
           if (!agent.children.includes(event.targetAgent)) {
             agent.children.push(event.targetAgent);
           }
-          const child = this.agents.get(event.targetAgent);
-          if (child) {
+          let child = this.agents.get(event.targetAgent);
+          if (!child) {
+            child = {
+              id: event.targetAgent,
+              name: event.targetAgent,
+              type: 'subagent' as const,
+              children: [],
+              capabilities: [],
+              status: 'idle',
+              sessionId: event.sessionId,
+              parentId: event.agent,
+              startedAt: event.timestamp,
+              tasksCompleted: 0,
+              tasksFailed: 0,
+            };
+            this.agents.set(event.targetAgent, child);
+          } else {
             child.parentId = event.agent;
             child.type = 'subagent';
           }
@@ -123,7 +138,14 @@ export class JsonStore implements EventStore {
     for (const event of events) {
       const agent = this.agents.get(event.agent);
       if (agent && !agents.has(event.agent)) {
-        agents.set(event.agent, agent);
+        agents.set(event.agent, { ...agent });
+      }
+      // Include child agents created via dispatch
+      if (event.targetAgent) {
+        const child = this.agents.get(event.targetAgent);
+        if (child && !agents.has(event.targetAgent)) {
+          agents.set(event.targetAgent, { ...child });
+        }
       }
     }
 

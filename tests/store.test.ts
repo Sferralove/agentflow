@@ -11,6 +11,9 @@ describe('JsonStore', () => {
   let store: JsonStore;
 
   beforeEach(() => {
+    if (fs.existsSync(TEST_FILE)) {
+      fs.rmSync(TEST_FILE);
+    }
     if (!fs.existsSync(TEST_DIR)) {
       fs.mkdirSync(TEST_DIR, { recursive: true });
     }
@@ -123,5 +126,39 @@ describe('JsonStore', () => {
     expect(sessions).toContain('s1');
     expect(sessions).toContain('s2');
     expect(sessions).toHaveLength(2);
+  });
+
+  it('should return agent info', async () => {
+    await store.addEvent({ id: 'e1', sessionId: 's1', type: 'start', agent: 'a1', payload: {}, timestamp: 1 });
+    const agent = await store.getAgentInfo('a1');
+    expect(agent).not.toBeNull();
+    expect(agent!.id).toBe('a1');
+  });
+
+  it('should return agent tree with events', async () => {
+    await store.addEvent({ id: 'e1', sessionId: 's1', type: 'start', agent: 'parent', payload: {}, timestamp: 1 });
+    await store.addEvent({ id: 'e2', sessionId: 's1', type: 'dispatch', agent: 'parent', targetAgent: 'child', payload: {}, timestamp: 2 });
+    const tree = await store.getAgentTree('s1');
+    expect(tree).toHaveLength(2);
+    const parent = tree.find(a => a.id === 'parent');
+    expect(parent).toBeDefined();
+    expect(parent!.events).toHaveLength(2);
+  });
+
+  it('should filter events by agent', async () => {
+    await store.addEvent({ id: 'e1', sessionId: 's1', type: 'start', agent: 'a1', payload: {}, timestamp: 1 });
+    await store.addEvent({ id: 'e2', sessionId: 's1', type: 'start', agent: 'a2', payload: {}, timestamp: 2 });
+    const a1Events = await store.getEvents({ agent: 'a1' });
+    expect(a1Events).toHaveLength(1);
+    expect(a1Events[0].agent).toBe('a1');
+  });
+
+  it('should filter events by time range', async () => {
+    await store.addEvent({ id: 'e1', sessionId: 's1', type: 'start', agent: 'a1', payload: {}, timestamp: 100 });
+    await store.addEvent({ id: 'e2', sessionId: 's1', type: 'start', agent: 'a1', payload: {}, timestamp: 200 });
+    await store.addEvent({ id: 'e3', sessionId: 's1', type: 'start', agent: 'a1', payload: {}, timestamp: 300 });
+    const rangeEvents = await store.getEvents({ from: 150, to: 250 });
+    expect(rangeEvents).toHaveLength(1);
+    expect(rangeEvents[0].id).toBe('e2');
   });
 });
