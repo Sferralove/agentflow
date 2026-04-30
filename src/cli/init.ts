@@ -30,7 +30,7 @@ export function initCommand(program: Command): void {
         fs.mkdirSync(dataDir, { recursive: true });
       }
 
-      // Deploy skill into project's .opencode/skills/ (auto-discovered by OpenCode)
+      // Deploy skill into .opencode/skills/agent-flow/ (auto-discovered by OpenCode)
       if (options.skill !== false) {
         const sourceSkill = path.resolve(__dirname, '../../skills/agent-flow/SKILL.md');
         const skillsDir = path.join(process.cwd(), '.opencode', 'skills', 'agent-flow');
@@ -40,6 +40,30 @@ export function initCommand(program: Command): void {
           fs.mkdirSync(skillsDir, { recursive: true });
           fs.copyFileSync(sourceSkill, targetSkill);
           console.log(`✓ Skill deployed to ${targetSkill}`);
+
+          // Add permission to opencode.json
+          const opencodeFile = path.join(process.cwd(), 'opencode.json');
+          let opencodeConfig: Record<string, unknown> = {};
+
+          if (fs.existsSync(opencodeFile)) {
+            try {
+              opencodeConfig = JSON.parse(fs.readFileSync(opencodeFile, 'utf-8'));
+            } catch {
+              console.log('Warning: Could not parse opencode.json');
+            }
+          }
+
+          // Ensure permission.skill["agent-flow"] = "allow"
+          const permission = (opencodeConfig.permission || {}) as Record<string, unknown>;
+          const skillPerms = (permission.skill || {}) as Record<string, string>;
+          if (skillPerms['agent-flow'] !== 'allow') {
+            skillPerms['agent-flow'] = 'allow';
+            permission.skill = skillPerms;
+            opencodeConfig.permission = permission;
+            delete opencodeConfig.$schema;
+            fs.writeFileSync(opencodeFile, JSON.stringify(opencodeConfig, null, 2));
+            console.log(`✓ Skill permission added to ${opencodeFile}`);
+          }
         } else {
           console.log(`Warning: Skill source not found at ${sourceSkill}`);
         }

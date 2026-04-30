@@ -29,7 +29,7 @@ function initCommand(program) {
         if (!fs_1.default.existsSync(dataDir)) {
             fs_1.default.mkdirSync(dataDir, { recursive: true });
         }
-        // Deploy skill into project's .opencode/skills/ (auto-discovered by OpenCode)
+        // Deploy skill into .opencode/skills/agent-flow/ (auto-discovered by OpenCode)
         if (options.skill !== false) {
             const sourceSkill = path_1.default.resolve(__dirname, '../../skills/agent-flow/SKILL.md');
             const skillsDir = path_1.default.join(process.cwd(), '.opencode', 'skills', 'agent-flow');
@@ -38,6 +38,28 @@ function initCommand(program) {
                 fs_1.default.mkdirSync(skillsDir, { recursive: true });
                 fs_1.default.copyFileSync(sourceSkill, targetSkill);
                 console.log(`✓ Skill deployed to ${targetSkill}`);
+                // Add permission to opencode.json
+                const opencodeFile = path_1.default.join(process.cwd(), 'opencode.json');
+                let opencodeConfig = {};
+                if (fs_1.default.existsSync(opencodeFile)) {
+                    try {
+                        opencodeConfig = JSON.parse(fs_1.default.readFileSync(opencodeFile, 'utf-8'));
+                    }
+                    catch {
+                        console.log('Warning: Could not parse opencode.json');
+                    }
+                }
+                // Ensure permission.skill["agent-flow"] = "allow"
+                const permission = (opencodeConfig.permission || {});
+                const skillPerms = (permission.skill || {});
+                if (skillPerms['agent-flow'] !== 'allow') {
+                    skillPerms['agent-flow'] = 'allow';
+                    permission.skill = skillPerms;
+                    opencodeConfig.permission = permission;
+                    delete opencodeConfig.$schema;
+                    fs_1.default.writeFileSync(opencodeFile, JSON.stringify(opencodeConfig, null, 2));
+                    console.log(`✓ Skill permission added to ${opencodeFile}`);
+                }
             }
             else {
                 console.log(`Warning: Skill source not found at ${sourceSkill}`);
