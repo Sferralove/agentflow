@@ -7,23 +7,23 @@ description: Real-time agent flow monitoring. Load at session start to log all a
 
 ## Overview
 
-Agent Flow is a per-project monitoring tool that visualizes agent/subagent workflows in real time. Every agent must log its operations — start, delegation, completion, errors — so the dashboard shows the full activity graph.
+Agent Flow visualizes agent/subagent workflows in real time. Every agent must log its operations — start, delegation, completion, errors — so the dashboard shows the full activity graph.
 
-## When to use this skill
+## When to load
 
-Load this skill at the **start of every session** (or when the Builder loads its instructions). It tells agents exactly how to log events to the Agent Flow server.
+Load this skill at the **start of every session**. It tells every agent exactly how to log events.
 
-## Setup (one-time per session)
+## One-time setup per session
 
 ### Generate a sessionId
 
-The **Builder** must generate a session ID at the start of every session and pass it to all subagents:
+The **primary agent** (the one that starts the session) must generate a session ID and pass it to all subagents:
 
 ```js
 const sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
 ```
 
-Store it in memory or pass it explicitly to every delegated agent.
+Pass `sessionId` to every subagent you delegate to — this groups all events into the same session.
 
 ### Server endpoint
 
@@ -32,132 +32,118 @@ POST http://localhost:3001/api/agent/event
 Content-Type: application/json
 ```
 
-## Required header
+## How to log
 
-All agents must use `fetch()` with this exact header:
+All agents use `fetch()`, fire-and-forget (never block on logging):
 
 ```js
 fetch('http://localhost:3001/api/agent/event', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ /* event data */ })
-}).catch(() => {}); // Fire-and-forget, never block on logging
+}).catch(() => {});
 ```
 
-## Event types and format
+## Event types
 
-### 1. START — when an agent begins a task
+### 1. START — when an agent begins work
+
+Log immediately after receiving a task, BEFORE doing any work.
 
 ```js
 fetch('http://localhost:3001/api/agent/event', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    agent: 'backend-dev',        // Your agent name
-    sessionId: sessionId,         // From Builder
+    agent: 'your-agent-name',    // Your agent identifier
+    sessionId: sessionId,        // From the primary agent
     type: 'start',
-    action: 'implement-feature',  // Short name of the task
-    description: 'Building user auth middleware'
+    action: 'short-task-name',   // e.g. 'implement-feature'
+    description: 'What you are about to do'
   })
 }).catch(() => {});
 ```
 
-**When:** Immediately upon receiving a delegated task. Log BEFORE doing any work.
+### 2. DELEGATION — when dispatching a subagent
 
-### 2. DELEGATION — when the Builder dispatches a subagent
+Log BEFORE delegating to a subagent. This creates the parent→child link in the flow graph.
 
 ```js
 fetch('http://localhost:3001/api/agent/event', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    agent: 'builder',
+    agent: 'your-agent-name',    // The delegator
     sessionId: sessionId,
     type: 'delegation',
-    targetAgent: 'backend-dev',
-    reason: 'Implementation needed for API routes'
+    targetAgent: 'subagent-name', // Who you are delegating to
+    reason: 'Why this delegation is needed'
   })
 }).catch(() => {});
+
+// Then pass sessionId to the subagent
 ```
 
-**When:** Right before delegating a task to a subagent. This creates the parent → child link in the flow graph.
+### 3. COMPLETE — when an agent finishes
 
-**IMPORTANT:** Always pass `sessionId` to the subagent so its events are grouped in the same session.
-
-### 3. COMPLETE — when an agent finishes a task
+Log AFTER producing output, BEFORE returning to the delegator.
 
 ```js
 fetch('http://localhost:3001/api/agent/event', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    agent: 'backend-dev',
+    agent: 'your-agent-name',
     sessionId: sessionId,
     type: 'complete',
-    action: 'implement-feature',
-    tokens: 4500,               // Approximate tokens used
-    description: 'Auth middleware done, 3 files changed'
+    action: 'short-task-name',
+    tokens: 4500,                 // Approximate tokens used
+    description: 'What was accomplished'
   })
 }).catch(() => {});
 ```
 
-**When:** After finishing a task. Log AFTER producing your output but BEFORE returning to the delegator.
-
-### 4. ERROR — when something goes wrong
+### 4. ERROR — when something fails
 
 ```js
 fetch('http://localhost:3001/api/agent/event', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    agent: 'backend-dev',
+    agent: 'your-agent-name',
     sessionId: sessionId,
     type: 'error',
-    description: 'TypeScript build failed: TS2345',
-    payload: { error: 'Type mismatch in route handler' }
+    description: 'What went wrong',
+    payload: { error: 'Error details' }
   })
 }).catch(() => {});
 ```
 
-**When:** Any time an agent encounters an error or fails a task.
+## Delegation pattern
 
-## Delegation rules
+- The **primary agent** generates `sessionId` and logs its own `start`
+- When delegating, it logs a `delegation` event with `targetAgent` set
+- **Always pass `sessionId`** to subagents so their events are grouped
+- Subagents log their own `start` and `complete`
+- Subagents should NOT delegate further without the primary agent's approval
 
-The **Builder** orchestrates. Subagents do not delegate further without Builder approval.
+## What NOT to log
 
-| Agent role | Delegates to | Reason |
-|------------|-------------|--------|
-| Builder | product-manager | Unclear requirements |
-| Builder | tech-lead | Architecture decisions |
-| Builder | backend-dev | Implementation |
-| Builder | frontend-dev | UI work |
-| Builder | tester | Testing/validation |
-| Builder | reviewer | Pre-commit review |
-| Builder | security-engineer | Security concerns |
-| Backend Dev | database-engineer | Schema/migrations |
-| Tester | backend-dev / frontend-dev | Bug fixes |
+These are internal operations — no log event needed:
+- Reading or searching files
+- Running build/test commands
+- Asking clarifying questions
 
-## Non-logging events
-
-These do NOT need a log event because they're internal to the agent:
-- Reading files (read tool)
-- Searching code (grep/glob)
-- Running build/test commands (bash tool)
-- Asking clarifying questions to the user
-
-## Anti-patterns to avoid
+## Anti-patterns
 
 ❌ Starting work before logging `start`
 ❌ Forgetting to pass `sessionId` to subagents
-❌ Using `await` on the fetch (must be fire-and-forget — `.catch(() => {})`)
-❌ Using `POST` for GET operations
-❌ Logging from sub-sub-agents without Builder knowing
-❌ Multiple agents using the same `agent` name in the same session
+❌ Using `await` on the fetch — must be fire-and-forget (`.catch(() => {})`)
+❌ Multiple agents using the same `agent` name
 
 ## Quick reference
 
 ```js
-// Template for logging
 function log(agent, type, extra = {}) {
   fetch('http://localhost:3001/api/agent/event', {
     method: 'POST',
@@ -167,15 +153,15 @@ function log(agent, type, extra = {}) {
 }
 
 // Usage:
-log('builder', 'start', { action: 'plan-task', description: 'Planning...' });
-log('builder', 'delegation', { targetAgent: 'backend-dev', reason: 'Build API' });
-log('backend-dev', 'start', { action: 'build-api' });
-log('backend-dev', 'complete', { action: 'build-api', tokens: 1200, description: 'Done' });
-log('builder', 'complete', { action: 'plan-task', tokens: 500 });
+log('primary-agent', 'start', { action: 'plan', description: 'Planning task' });
+log('primary-agent', 'delegation', { targetAgent: 'subagent', reason: 'Implementation needed' });
+log('subagent', 'start', { action: 'build', description: 'Building feature' });
+log('subagent', 'complete', { action: 'build', tokens: 1200, description: 'Done' });
+log('primary-agent', 'complete', { action: 'plan', tokens: 500 });
 ```
 
-## Viewing the dashboard
+## Dashboard
 
 ```
-http://localhost:3000
+http://localhost:3001
 ```
