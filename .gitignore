@@ -1,5 +1,4 @@
 node_modules/
-dist/
 .agent-flow/
 .DS_Store
 *.tgz
