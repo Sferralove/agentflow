@@ -93,11 +93,11 @@ export function initCommand(program: Command): void {
       console.log('Agent Flow initialized!');
       console.log(`Config: ${configFile}`);
       console.log(`Data: ${dataDir}`);
-      console.log(`Dashboard: http://localhost:3000`);
+      console.log(`Dashboard: http://localhost:3001`);
       console.log('');
       console.log('Next steps:');
       console.log('  1. Run: npx agent-flow serve');
-      console.log('  2. Open http://localhost:3000 to view the dashboard');
+      console.log('  2. Open http://localhost:3001 to view the dashboard');
       console.log('  3. Agents auto-log via the deployed skill');
     });
 }

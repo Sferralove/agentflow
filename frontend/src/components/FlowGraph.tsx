@@ -106,6 +106,24 @@ function buildTimelineLayout(events: AgentEvent[]): { nodes: Node[]; edges: Edge
   const H_GAP = 340, V_GAP = 130, TASK_GAP = 100, TASK_PAD = 60;
   const nodes: Node[] = [];
   const edges: Edge[] = [];
+
+  // Fallback: no dispatch events → show all agents as standalone nodes
+  if (tasks.length === 0 && allAgents.size > 0) {
+    const agents = Array.from(allAgents);
+    agents.forEach((agent, i) => {
+      const icon = agentIcon(agent);
+      nodes.push({
+        id: agent,
+        type: 'agentFlow',
+        data: { ...deriveAgentData(agent, events), label: `${icon} ${agent}` },
+        position: { x: i * H_GAP, y: 0 },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+      });
+    });
+    return { nodes, edges };
+  }
+
   let xOffset = 0;
   let prevTaskTargets: string[] = [];
   let edgeOrder = 0;
