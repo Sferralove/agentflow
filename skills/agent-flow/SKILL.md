@@ -1,6 +1,6 @@
 ---
 name: agent-flow
-description: Log operations to the Agent Flow monitoring dashboard. Use when working in a project with Agent Flow enabled - ensures all agent activity is tracked and visualized in real time.
+description: Real-time agent flow monitoring. Load at session start to log all agent activity (start, delegation, complete, error) to the Agent Flow dashboard. Required in every session.
 ---
 
 # Agent Flow — Monitoring Skill

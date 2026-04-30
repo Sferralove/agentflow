@@ -64,6 +64,26 @@ export function initCommand(program: Command): void {
             fs.writeFileSync(opencodeFile, JSON.stringify(opencodeConfig, null, 2));
             console.log(`✓ Skill permission added to ${opencodeFile}`);
           }
+
+          // Add startup instruction so Builder auto-loads the skill
+          const instructionsDir = path.join(process.cwd(), '.opencode', 'instructions');
+          const startupFile = path.join(instructionsDir, 'agent-flow.md');
+          fs.mkdirSync(instructionsDir, { recursive: true });
+          fs.writeFileSync(startupFile,
+            'IMPORTANT: At the start of every session, load the agent-flow skill:\n' +
+            '```\nskill({ name: "agent-flow" })\n```\n' +
+            'This enables real-time monitoring of all agent activity in the dashboard.\n');
+          console.log(`✓ Startup instruction created at ${startupFile}`);
+
+          // Add instruction to opencode.json if not already present
+          const instructions = Array.isArray(opencodeConfig.instructions) ? opencodeConfig.instructions as string[] : [];
+          if (!instructions.includes(startupFile)) {
+            instructions.push(startupFile);
+            opencodeConfig.instructions = instructions;
+            delete opencodeConfig.$schema;
+            fs.writeFileSync(opencodeFile, JSON.stringify(opencodeConfig, null, 2));
+            console.log(`✓ Startup instruction referenced in ${opencodeFile}`);
+          }
         } else {
           console.log(`Warning: Skill source not found at ${sourceSkill}`);
         }
