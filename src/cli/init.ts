@@ -30,40 +30,16 @@ export function initCommand(program: Command): void {
         fs.mkdirSync(dataDir, { recursive: true });
       }
 
-      // Deploy skill into project and configure opencode.json
+      // Deploy skill into project's .opencode/skills/ (auto-discovered by OpenCode)
       if (options.skill !== false) {
         const sourceSkill = path.resolve(__dirname, '../../skills/agent-flow/SKILL.md');
-        const targetSkill = path.join(configDir, 'SKILL.md');
+        const skillsDir = path.join(process.cwd(), '.opencode', 'skills', 'agent-flow');
+        const targetSkill = path.join(skillsDir, 'SKILL.md');
 
         if (fs.existsSync(sourceSkill)) {
-          // Copy skill into project's .agent-flow/ directory
+          fs.mkdirSync(skillsDir, { recursive: true });
           fs.copyFileSync(sourceSkill, targetSkill);
           console.log(`✓ Skill deployed to ${targetSkill}`);
-
-          // Configure opencode.json
-          const opencodeFile = path.join(process.cwd(), 'opencode.json');
-          let opencodeConfig: { instructions?: string[] } & Record<string, unknown> = {};
-
-          if (fs.existsSync(opencodeFile)) {
-            try {
-              opencodeConfig = JSON.parse(fs.readFileSync(opencodeFile, 'utf-8'));
-            } catch {
-              console.log('Warning: Could not parse opencode.json');
-            }
-          }
-
-          const instructions: string[] = Array.isArray(opencodeConfig.instructions)
-            ? opencodeConfig.instructions
-            : [];
-
-          if (!instructions.includes(targetSkill)) {
-            instructions.push(targetSkill);
-            opencodeConfig.instructions = instructions;
-            // Remove $schema to avoid version-check errors from opencode.ai
-            delete opencodeConfig.$schema;
-            fs.writeFileSync(opencodeFile, JSON.stringify(opencodeConfig, null, 2));
-            console.log(`✓ Skill referenced in ${opencodeFile}`);
-          }
         } else {
           console.log(`Warning: Skill source not found at ${sourceSkill}`);
         }
