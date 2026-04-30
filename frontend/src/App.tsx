@@ -13,7 +13,11 @@ function App() {
       .catch(() => {});
   }, []);
 
-  const { events: wsEvents } = useWebSocket('ws://localhost:3001');
+  // In Vite dev (port 5173), WS is on port 3001. In production, same origin.
+  const wsUrl = window.location.port === '5173'
+    ? 'ws://localhost:3001'
+    : `ws://${window.location.host}`;
+  const { events: wsEvents, connected } = useWebSocket(wsUrl);
 
   // Merge WS events with initial fetch
   useEffect(() => {
@@ -26,7 +30,7 @@ function App() {
     }
   }, [wsEvents]);
 
-  return <Dashboard events={events} onNewEvent={(event) => setEvents((prev) => [...prev, event])} />;
+  return <Dashboard events={events} connected={connected} onNewEvent={(event) => setEvents((prev) => [...prev, event])} />;
 }
 
 export default App;

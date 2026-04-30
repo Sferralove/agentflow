@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import type { Server } from 'http';
 import type { EventStore, AgentEvent, WSMessage } from '../types';
 
 export class AgentFlowWSServer {
@@ -17,9 +18,12 @@ export class AgentFlowWSServer {
     this.onEventCallback = callback;
   }
 
-  async start(): Promise<void> {
+  async start(httpServer?: Server): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.wss = new WebSocketServer({ port: this.port });
+      // Attach to existing HTTP server, or create standalone
+      this.wss = new WebSocketServer(
+        httpServer ? { server: httpServer } : { port: this.port }
+      );
 
       this.wss.on('connection', (ws) => {
         this.handleConnection(ws);
@@ -31,10 +35,17 @@ export class AgentFlowWSServer {
       });
 
       this.wss.on('listening', () => {
-        console.log(`WebSocket server started on port ${this.port}`);
+        console.log(`WebSocket attached${httpServer ? '' : ` on port ${this.port}`}`);
         resolve();
         this.startHeartbeat();
       });
+
+      // If attached to existing server, resolve immediately
+      if (httpServer) {
+        // WebSocketServer with {server} doesn't emit 'listening', so resolve now
+        resolve();
+        this.startHeartbeat();
+      }
     });
   }
 

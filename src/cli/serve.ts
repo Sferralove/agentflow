@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import path from 'path';
 import fs from 'fs';
+import http from 'http';
 import express from 'express';
 import { AgentFlowServer } from '../server';
 import { createAPIRouter } from '../api/routes';
@@ -9,10 +10,10 @@ export function serveCommand(program: Command): void {
   program
     .command('serve')
     .description('Start the agent-flow server')
-    .option('-p, --port <number>', 'WebSocket port', '3001')
+    .option('-p, --port <number>', 'HTTP + WebSocket port', '3001')
     .action(async (options) => {
-      const wsPort = parseInt(options.port, 10);
-      if (isNaN(wsPort)) {
+      const port = parseInt(options.port, 10);
+      if (isNaN(port)) {
         console.error('Error: Invalid port number');
         process.exit(1);
       }
@@ -23,7 +24,7 @@ export function serveCommand(program: Command): void {
         process.exit(1);
       }
 
-      const server = new AgentFlowServer(dataDir, wsPort);
+      const server = new AgentFlowServer(dataDir, port);
       const store = server.getStore();
 
       const app = express();
@@ -36,22 +37,24 @@ export function serveCommand(program: Command): void {
         console.log('Warning: Frontend not found. Dashboard unavailable.');
       }
 
-      app.listen(3000, () => {
-        console.log('Dashboard: http://localhost:3000');
-      });
+      const httpServer = http.createServer(app);
 
       // Register shutdown handlers before anything blocking
       const shutdown = async () => {
         console.log('\nShutting down...');
+        httpServer.close();
         await server.stop();
         process.exit(0);
       };
       process.on('SIGINT', shutdown);
       process.on('SIGTERM', shutdown);
 
-      await server.startWS();
-      console.log(`WebSocket: ws://localhost:${wsPort}`);
-      console.log('API: http://localhost:3000/api');
+      await server.startWS(httpServer);
+
+      httpServer.listen(port, () => {
+        console.log(`Dashboard + API: http://localhost:${port}`);
+        console.log(`WebSocket:     ws://localhost:${port}`);
+      });
 
       // Start MCP in background (stdio transport blocks)
       server.startMCP().catch(console.error);

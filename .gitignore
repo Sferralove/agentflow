@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.agent-flow/
+.DS_Store
+*.tgz
+tests/test-data/
+frontend/node_modules/
+frontend/dist/

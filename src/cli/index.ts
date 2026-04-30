@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import { initCommand } from './init';
 import { serveCommand } from './serve';
+import { devCommand } from './dev';
 import { statusCommand } from './status';
 import { exportCommand } from './export';
 
@@ -14,6 +15,7 @@ program
 
 initCommand(program);
 serveCommand(program);
+devCommand(program);
 statusCommand(program);
 exportCommand(program);
 

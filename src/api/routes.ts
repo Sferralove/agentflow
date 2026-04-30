@@ -1,8 +1,14 @@
 import express from 'express';
-import type { JsonStore } from '../store/json-store';
+import { v4 as uuidv4 } from 'uuid';
+import type { EventStore } from '../store';
+import type { AgentEvent, EventType } from '../types';
 
-export function createAPIRouter(store: JsonStore): express.Router {
+const VALID_EVENT_TYPES: EventType[] = ['start', 'complete', 'dispatch', 'task', 'error', 'message'];
+
+export function createAPIRouter(store: EventStore): express.Router {
   const router = express.Router();
+
+  router.use(express.json());
 
   router.get('/api/events', async (_req, res) => {
     const events = await store.getEvents();
@@ -30,6 +36,43 @@ export function createAPIRouter(store: JsonStore): express.Router {
       return;
     }
     res.json(agent);
+  });
+
+  router.post('/api/agent/event', async (req, res) => {
+    try {
+      const { type: rawType, agent, sessionId, targetAgent, payload, ...extra } = req.body;
+
+      if (!rawType || !agent || !sessionId) {
+        res.status(400).json({ error: 'Missing required fields: type, agent, sessionId' });
+        return;
+      }
+
+      // Map 'delegation' → 'dispatch' for backward compat with agent prompts
+      const type = rawType === 'delegation' ? 'dispatch' : rawType;
+
+      if (!VALID_EVENT_TYPES.includes(type)) {
+        res.status(400).json({ error: `Invalid event type: ${type}` });
+        return;
+      }
+
+      // Merge explicit payload + any extra fields (action, description, tokens, reason, etc.)
+      const mergedPayload = { ...extra, ...(payload || {}) };
+
+      const event: AgentEvent = {
+        id: uuidv4(),
+        sessionId,
+        type: type as EventType,
+        agent,
+        targetAgent,
+        payload: mergedPayload,
+        timestamp: Date.now(),
+      };
+
+      await store.addEvent(event);
+      res.status(201).json({ success: true, eventId: event.id });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Internal server error' });
+    }
   });
 
   return router;

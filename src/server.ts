@@ -1,23 +1,27 @@
-import { JsonStore } from './store/json-store';
+import type { Server } from 'http';
+import { MultiStore } from './store/multi-store';
 import { AgentFlowMCPServer } from './mcp/server';
 import { AgentFlowWSServer } from './ws/server';
 import type { AgentEvent } from './types';
 
 export class AgentFlowServer {
-  private store: JsonStore;
+  private store: MultiStore;
   private mcpServer: AgentFlowMCPServer;
   private wsServer: AgentFlowWSServer;
 
   constructor(dataDir: string, wsPort: number) {
-    const storePath = `${dataDir}/events.json`;
-    this.store = new JsonStore(storePath);
+    this.store = new MultiStore(dataDir);
     this.wsServer = new AgentFlowWSServer(wsPort);
 
     // Wrap store.addEvent to trigger WS broadcast via monkey-patch
+    // Broadcast FIRST (real-time), then persist asynchronously
     const originalAddEvent = this.store.addEvent.bind(this.store);
     this.store.addEvent = async (event: AgentEvent) => {
-      await originalAddEvent(event);
+      // Push to memory and persist (non-blocking for broadcast)
+      const savePromise = originalAddEvent(event);
+      // Broadcast immediately — don't wait for disk I/O
       this.wsServer.broadcast(event);
+      await savePromise;
     };
 
     this.mcpServer = new AgentFlowMCPServer(this.store);
@@ -27,8 +31,8 @@ export class AgentFlowServer {
     await this.mcpServer.start();
   }
 
-  async startWS(): Promise<void> {
-    await this.wsServer.start();
+  async startWS(httpServer?: Server): Promise<void> {
+    await this.wsServer.start(httpServer);
   }
 
   async stop(): Promise<void> {
@@ -36,7 +40,7 @@ export class AgentFlowServer {
     await this.mcpServer.stop();
   }
 
-  getStore(): JsonStore {
+  getStore(): MultiStore {
     return this.store;
   }
 }
