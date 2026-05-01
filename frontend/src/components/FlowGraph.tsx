@@ -20,7 +20,8 @@ function hashStr(s: string): number {
 }
 
 function deriveStatus(agentId: string, events: AgentEvent[]): AgentStatus {
-  const agentEvents = events.filter(e => e.agent === agentId);
+  const realAgent = agentId.includes(':t') ? agentId.split(':t')[0] : agentId;
+  const agentEvents = events.filter(e => e.agent === realAgent);
   if (agentEvents.length === 0) return 'idle';
   const last = agentEvents[agentEvents.length - 1];
   const m: Record<EventType, AgentStatus> = {
@@ -30,8 +31,13 @@ function deriveStatus(agentId: string, events: AgentEvent[]): AgentStatus {
   return m[last.type] || 'idle';
 }
 
+function realAgentName(agentId: string): string {
+  return agentId.includes(':t') ? agentId.split(':t')[0] : agentId;
+}
+
 function deriveAgentData(agentId: string, events: AgentEvent[]): AgentNodeData {
-  const agentEvents = events.filter(e => e.agent === agentId);
+  const realName = realAgentName(agentId);
+  const agentEvents = events.filter(e => e.agent === realName);
   const status = deriveStatus(agentId, events);
   let tasksCompleted = 0, tasksFailed = 0;
   let startedAt: number | undefined, completedAt: number | undefined;
@@ -119,9 +125,17 @@ function buildTimelineLayout(events: AgentEvent[]): { nodes: Node[]; edges: Edge
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  // Fallback: no dispatch events → show all agents as standalone nodes
+  // Fallback: no dispatch events → show all agents as standalone nodes with timeline edges
   if (tasks.length === 0 && allAgents.size > 0) {
-    const agents = Array.from(allAgents);
+    // Sort agents by their first event time
+    const agentFirstTime = new Map<string, number>();
+    for (const e of events) {
+      if (!agentFirstTime.has(e.agent) || e.timestamp < agentFirstTime.get(e.agent)!)
+        agentFirstTime.set(e.agent, e.timestamp);
+    }
+    const agents = Array.from(allAgents).sort((a, b) =>
+      (agentFirstTime.get(a) ?? 0) - (agentFirstTime.get(b) ?? 0)
+    );
     agents.forEach((agent, i) => {
       const icon = agentIcon(agent);
       nodes.push({
@@ -133,6 +147,33 @@ function buildTimelineLayout(events: AgentEvent[]): { nodes: Node[]; edges: Edge
         targetPosition: Position.Left,
       });
     });
+    // Add chronological flow edges
+    for (let i = 0; i < agents.length - 1; i++) {
+      const src = agents[i];
+      const tgt = agents[i + 1];
+      const tgtStatus = deriveStatus(tgt, events);
+      const tgtRunning = tgtStatus === 'running';
+      const time = new Date(agentFirstTime.get(tgt) ?? Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      edges.push({
+        id: `${src}→${tgt}:flow`,
+        source: src, target: tgt,
+        type: 'smoothstep',
+        animated: tgtRunning,
+        label: `⏱ ${time}`,
+        labelStyle: { fill: '#6b7280', fontSize: 9, fontWeight: 400 },
+        labelBgStyle: { fill: '#1f2937', fillOpacity: 0.9 },
+        style: {
+          stroke: tgtRunning ? '#818cf8' : '#4b5563',
+          strokeWidth: tgtRunning ? 2 : 1,
+          strokeDasharray: tgtRunning ? 'none' : '4,4',
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 14, height: 14,
+          color: tgtRunning ? '#818cf8' : '#4b5563',
+        },
+      });
+    }
     return { nodes, edges };
   }
 
