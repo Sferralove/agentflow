@@ -41,8 +41,11 @@ function deriveAgentData(agentId: string, events: AgentEvent[]): AgentNodeData {
     if (e.type === 'start' && !startedAt) startedAt = e.timestamp;
     if (e.type === 'complete') { tasksCompleted++; completedAt = e.timestamp; }
     if (e.type === 'error') tasksFailed++;
-    // Extract model from any event payload
-    if (!model && e.payload?.model && typeof e.payload.model === 'string') model = e.payload.model;
+    // Extract model from any event payload (try multiple field names)
+    if (!model) {
+      const m = e.payload?.model || e.payload?.modelId || e.payload?.modelName || e.payload?.model_name;
+      if (typeof m === 'string') model = m;
+    }
     // Extract task name from latest start event
     if (e.type === 'start') {
       const t = e.payload?.action || e.payload?.description;

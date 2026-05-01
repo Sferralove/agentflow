@@ -58,7 +58,7 @@ export default function AgentFlowNode({ data }: NodeProps<AgentNodeData>) {
       {/* Model badge */}
       {model && (
         <div className="mb-1">
-          <span className="text-[9px] bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded-full font-medium truncate block max-w-[140px]">
+          <span className="text-[10px] bg-gray-600/50 text-gray-200 px-2 py-0.5 rounded-full font-medium truncate block max-w-[150px]">
             {model}
           </span>
         </div>
