@@ -4,6 +4,8 @@ import type { AgentStatus } from '../types';
 export interface AgentNodeData {
   label: string;       // already includes icon prefix like "⬡ builder"
   status: AgentStatus;
+  model?: string;      // e.g. "claude-sonnet-4" or "deepseek-v4-pro"
+  taskName?: string;   // current task from latest start event action/description
   tasksCompleted?: number;
   tasksFailed?: number;
   startedAt?: number;
@@ -18,7 +20,7 @@ const statusConfig: Record<AgentStatus, { border: string; bg: string; glow: stri
 };
 
 export default function AgentFlowNode({ data }: NodeProps<AgentNodeData>) {
-  const { label, status, tasksCompleted = 0, tasksFailed = 0, startedAt, completedAt } = data;
+  const { label, status, model, taskName, tasksCompleted = 0, tasksFailed = 0, startedAt, completedAt } = data;
   const cfg = statusConfig[status] || statusConfig.idle;
 
   // Time progress bar
@@ -49,9 +51,25 @@ export default function AgentFlowNode({ data }: NodeProps<AgentNodeData>) {
       <Handle type="target" position={Position.Left} className="!bg-gray-400 !w-3 !h-3" />
 
       {/* Header: icon + name */}
-      <div className="flex items-center gap-1.5 mb-1">
+      <div className="flex items-center gap-1.5 mb-0.5">
         <span className="font-semibold text-sm truncate">{label}</span>
       </div>
+
+      {/* Model badge */}
+      {model && (
+        <div className="mb-1">
+          <span className="text-[9px] bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded-full font-medium truncate block max-w-[140px]">
+            {model}
+          </span>
+        </div>
+      )}
+
+      {/* Task name */}
+      {taskName && status === 'running' && (
+        <div className="text-[10px] text-gray-300 mb-1 truncate" title={taskName}>
+          <span className="text-gray-500">▸</span> {taskName}
+        </div>
+      )}
 
       {/* Task counter */}
       {hasTasks && (

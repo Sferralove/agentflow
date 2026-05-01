@@ -35,12 +35,21 @@ function deriveAgentData(agentId: string, events: AgentEvent[]): AgentNodeData {
   const status = deriveStatus(agentId, events);
   let tasksCompleted = 0, tasksFailed = 0;
   let startedAt: number | undefined, completedAt: number | undefined;
+  let model: string | undefined;
+  let taskName: string | undefined;
   for (const e of agentEvents) {
     if (e.type === 'start' && !startedAt) startedAt = e.timestamp;
     if (e.type === 'complete') { tasksCompleted++; completedAt = e.timestamp; }
     if (e.type === 'error') tasksFailed++;
+    // Extract model from any event payload
+    if (!model && e.payload?.model && typeof e.payload.model === 'string') model = e.payload.model;
+    // Extract task name from latest start event
+    if (e.type === 'start') {
+      const t = e.payload?.action || e.payload?.description;
+      if (typeof t === 'string') taskName = t;
+    }
   }
-  return { label: agentId, status, tasksCompleted, tasksFailed, startedAt, completedAt };
+  return { label: agentId, status, model, taskName, tasksCompleted, tasksFailed, startedAt, completedAt };
 }
 
 /** Deduce an icon/emoji from agent name */

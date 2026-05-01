@@ -50,6 +50,8 @@ fetch('http://localhost:3001/api/agent/event', {
 
 Log immediately after receiving a task, BEFORE doing any work.
 
+Include `model` — the AI model powering this agent (find it in your system prompt, e.g. "claude-sonnet-4", "deepseek-v4-pro").
+
 ```js
 fetch('http://localhost:3001/api/agent/event', {
   method: 'POST',
@@ -59,6 +61,7 @@ fetch('http://localhost:3001/api/agent/event', {
     sessionId: sessionId,        // From the primary agent
     type: 'start',
     action: 'short-task-name',   // e.g. 'implement-feature'
+    model: 'your-model-name',    // e.g. 'claude-sonnet-4-20250514'
     description: 'What you are about to do'
   })
 }).catch(() => {});
@@ -153,9 +156,9 @@ function log(agent, type, extra = {}) {
 }
 
 // Usage:
-log('primary-agent', 'start', { action: 'plan', description: 'Planning task' });
+log('primary-agent', 'start', { action: 'plan', model: 'claude-sonnet-4', description: 'Planning task' });
 log('primary-agent', 'delegation', { targetAgent: 'subagent', reason: 'Implementation needed' });
-log('subagent', 'start', { action: 'build', description: 'Building feature' });
+log('subagent', 'start', { action: 'build', model: 'claude-sonnet-4', description: 'Building feature' });
 log('subagent', 'complete', { action: 'build', tokens: 1200, description: 'Done' });
 log('primary-agent', 'complete', { action: 'plan', tokens: 500 });
 ```
