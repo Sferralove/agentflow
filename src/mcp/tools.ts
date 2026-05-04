@@ -18,7 +18,7 @@ export function createMCPTools(store: EventStore) {
       name: 'send_event' as const,
       description: 'Send an agent event to the flow monitor',
       inputSchema: {
-        type: z.enum(['start', 'complete', 'dispatch', 'task', 'error', 'message']),
+        type: z.enum(['start', 'complete', 'dispatch', 'delegation', 'task', 'error', 'message']),
         agent: z.string(),
         sessionId: z.string(),
         targetAgent: z.string().optional(),
@@ -26,13 +26,15 @@ export function createMCPTools(store: EventStore) {
       },
       handler: async (args: { type: string; agent: string; sessionId: string; targetAgent?: string; payload?: Record<string, unknown> }) => {
         try {
-          if (!VALID_EVENT_TYPES.includes(args.type as EventType)) {
-            return errorResponse(`Invalid event type: ${args.type}`);
+          // Map 'delegation' → 'dispatch' for backward compat
+          const eventType = args.type === 'delegation' ? 'dispatch' : args.type;
+          if (!VALID_EVENT_TYPES.includes(eventType as EventType)) {
+            return errorResponse(`Invalid event type: ${eventType}`);
           }
           const event: AgentEvent = {
             id: uuidv4(),
             sessionId: args.sessionId,
-            type: args.type as EventType,
+            type: eventType as EventType,
             agent: args.agent,
             targetAgent: args.targetAgent,
             payload: args.payload || {},

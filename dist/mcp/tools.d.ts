@@ -12,6 +12,7 @@ export declare function createMCPTools(store: EventStore): {
                 task: "task";
                 error: "error";
                 message: "message";
+                delegation: "delegation";
             }>;
             agent: z.ZodString;
             sessionId: z.ZodString;
