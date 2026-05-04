@@ -1,28 +1,39 @@
 {
   "name": "agent-flow-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "OpenCode plugin for automatic agent flow monitoring — no agent cooperation needed",
   "type": "module",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
-    "index.js",
-    "index.d.ts",
-    "hooks/",
-    "store/",
-    "tools/",
-    "types.js",
-    "types.d.ts"
+    "dist/"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test": "tsx --test src/**/*.test.ts",
+    "lint": "eslint src/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/angelosferra/agent-flow-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/angelosferra/agent-flow-plugin/issues"
+  },
+  "homepage": "https://github.com/angelosferra/agent-flow-plugin#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "peerDependencies": {
     "@opencode-ai/plugin": "*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.6.0"
   },
   "keywords": ["opencode", "plugin", "monitoring", "agent-flow"],
