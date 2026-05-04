@@ -28,7 +28,7 @@ export default function StatsBar({ events, connected }: StatsBarProps) {
           Errors: <span className="text-red-400 font-semibold">{stats.errors}</span>
         </span>
       )}
-      {stats.first > 0 && (
+      {events.length > 1 && (
         <span>
           Duration: <span className="text-gray-200">{stats.elapsed}</span>
         </span>

@@ -73,7 +73,6 @@ function buildGraph(events: AgentEvent[]): { nodes: Node[]; edges: Edge[] } {
 
 export default function FlowGraph({ events }: { events: AgentEvent[] }) {
   const graph = useMemo(() => buildGraph(events), [events]);
-  const reactFlowKey = `flow-${events.length}`;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -83,7 +82,6 @@ export default function FlowGraph({ events }: { events: AgentEvent[] }) {
       </div>
       <div className="flex-1">
         <ReactFlow
-          key={reactFlowKey}
           nodes={graph.nodes}
           edges={graph.edges}
           nodeTypes={nodeTypes}
