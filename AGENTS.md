@@ -2,7 +2,7 @@
 
 ## Project identity
 
-Agent Flow — per-project monitoring tool for OpenCode agent/subagent workflows. Real-time flow graph via HTTP API + WebSocket + React dashboard.
+Agent Flow — per-project monitoring tool for OpenCode agent/subagent workflows. Real-time flow graph via MCP tools + WebSocket + React dashboard. HTTP API available as fallback.
 
 ## Install & run
 
@@ -97,7 +97,7 @@ frontend/        React + ReactFlow + Vite (separate package.json, own node_modul
 
 ## Data flow
 
-1. Agent calls `POST /api/agent/event` (HTTP via `fetch()`) or MCP tool `send_event` (stdio)
+1. Agent calls MCP tool `send_event` (stdio, primary) or `POST /api/agent/event` (HTTP, fallback)
 2. Handler writes event to `JsonStore` via `MultiStore`
 3. Monkey-patched `addEvent` broadcasts via WebSocket immediately, then persists to disk
 4. Frontend React dashboard receives WS events, renders flow graph in real time

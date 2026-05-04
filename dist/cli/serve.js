@@ -52,9 +52,6 @@ function serveCommand(program) {
             console.log(`Dashboard + API: http://localhost:${port}`);
             console.log(`WebSocket:     ws://localhost:${port}`);
         });
-        // Start MCP in background (stdio transport blocks)
-        server.startMCP().catch(console.error);
-        console.log('MCP server available via stdio');
     });
 }
 //# sourceMappingURL=serve.js.map
