@@ -7,6 +7,7 @@ export function initCommand(program: Command): void {
     .command('init')
     .description('Initialize agent-flow in the current project')
     .option('--no-skill', 'Skip deploying agent-flow skill to project')
+    .option('--no-mcp', 'Skip adding MCP server config to opencode.json')
     .action(async (options) => {
       const configDir = path.join(process.cwd(), '.agent-flow');
       const configFile = path.join(configDir, 'config.json');
@@ -86,6 +87,35 @@ export function initCommand(program: Command): void {
           }
         } else {
           console.log(`Warning: Skill source not found at ${sourceSkill}`);
+        }
+      }
+
+      // Add MCP server config to opencode.json
+      if (options.mcp !== false) {
+        const opencodeFile = path.join(process.cwd(), 'opencode.json');
+        let opencodeConfig: Record<string, unknown> = {};
+
+        if (fs.existsSync(opencodeFile)) {
+          try {
+            opencodeConfig = JSON.parse(fs.readFileSync(opencodeFile, 'utf-8'));
+          } catch {
+            console.log('Warning: Could not parse opencode.json');
+          }
+        }
+
+        // Add MCP server config
+        const mcp = (opencodeConfig.mcp || {}) as Record<string, unknown>;
+        if (!mcp['agent-flow']) {
+          mcp['agent-flow'] = {
+            command: 'npx',
+            args: ['agent-flow-mcp'],
+          };
+          opencodeConfig.mcp = mcp;
+          delete opencodeConfig.$schema;
+          fs.writeFileSync(opencodeFile, JSON.stringify(opencodeConfig, null, 2));
+          console.log(`✓ MCP server config added to ${opencodeFile}`);
+        } else {
+          console.log('MCP server already configured');
         }
       }
 

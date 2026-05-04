@@ -8,7 +8,8 @@
     "skills/"
   ],
   "bin": {
-    "agent-flow": "dist/cli/index.js"
+    "agent-flow": "dist/cli/index.js",
+    "agent-flow-mcp": "dist/mcp/stdio.js"
   },
   "scripts": {
     "build": "tsc && (cd frontend && npm run build || true) && mkdir -p dist/public && cp -r frontend/dist/* dist/public/",
