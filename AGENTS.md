@@ -18,7 +18,7 @@ npm install
 npm run build    # tsc -p tsconfig.json
 ```
 
-**Build quirk:** `tsconfig.json` has `outDir: "."` and `rootDir: "src"`. Compiled `.js`/`.d.ts` land next to source in project root (e.g. `src/hooks/session.ts` → `hooks/session.js`). The `package.json` `files` array ships only the compiled output.
+**Build output:** Compiled `.js`/`.d.ts` go to `dist/` (e.g. `src/hooks/session.ts` → `dist/hooks/session.js`). The `package.json` `files` array ships only `dist/`.
 
 ## Plugin API shape
 

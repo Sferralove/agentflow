@@ -2,26 +2,20 @@ import type { AgentEvent } from '../types.js';
 import type { PluginStore } from '../store/index.js';
 import type { PluginContainer } from '../plugin-container.js';
 import { generateId } from '../util/id.js';
-
-interface MessageInput {
-  message?: {
-    id: string;
-    role: string;
-    content?: string;
-  };
-}
+import { isMessageInput } from '../util/guards.js';
 
 export function createMessageHooks(store: PluginStore, container: PluginContainer) {
   return {
     'message.updated': async (input: unknown) => {
-      const inp = input as MessageInput;
-      if (!container.sessionId || !inp.message) return;
+      if (!isMessageInput(input)) return;
+      if (!container.sessionId || !input.message) return;
 
-      if (inp.message.role !== 'assistant') return;
-      if (container.loggedMessages.has(inp.message.id)) return;
-      container.loggedMessages.add(inp.message.id);
+      const msg = input.message;
+      if (msg.role !== 'assistant') return;
+      if (container.loggedMessages.has(msg.id)) return;
+      container.loggedMessages.add(msg.id);
 
-      const content = inp.message.content || '';
+      const content = msg.content || '';
       const preview = content.length > 300 ? content.slice(0, 300) + '...' : content;
 
       const event: AgentEvent = {
@@ -32,7 +26,7 @@ export function createMessageHooks(store: PluginStore, container: PluginContaine
         payload: {
           action: 'response',
           description: preview,
-          messageId: inp.message.id,
+          messageId: msg.id,
           contentLength: content.length,
         },
         timestamp: Date.now(),

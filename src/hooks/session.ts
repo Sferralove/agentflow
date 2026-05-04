@@ -2,12 +2,14 @@ import type { AgentEvent } from '../types.js';
 import type { PluginStore } from '../store/index.js';
 import type { PluginContainer } from '../plugin-container.js';
 import { generateId } from '../util/id.js';
+import { isSessionCreatedInput, isSessionErrorInput } from '../util/guards.js';
 
 export function createSessionHook(store: PluginStore, container: PluginContainer) {
   return {
     'session.created': async (input: unknown) => {
-      const inp = input as { session?: { id: string; title?: string } };
-      container.sessionId = inp.session?.id || ('session-' + Date.now());
+      if (!isSessionCreatedInput(input)) return;
+      const title = input.session?.title;
+      container.sessionId = input.session?.id || ('session-' + Date.now());
       container.sessionStartedAt = Date.now();
 
       const event: AgentEvent = {
@@ -16,7 +18,7 @@ export function createSessionHook(store: PluginStore, container: PluginContainer
         type: 'start',
         agent: 'opencode',
         payload: {
-          action: inp.session?.title || 'new-session',
+          action: title || 'new-session',
           description: 'Session started',
         },
         timestamp: container.sessionStartedAt,
@@ -46,7 +48,7 @@ export function createSessionHook(store: PluginStore, container: PluginContainer
 
     'session.error': async (input: unknown) => {
       if (!container.sessionId) return;
-      const inp = input as { error?: { message?: string } };
+      if (!isSessionErrorInput(input)) return;
 
       const event: AgentEvent = {
         id: generateId(),
@@ -54,8 +56,8 @@ export function createSessionHook(store: PluginStore, container: PluginContainer
         type: 'error',
         agent: 'opencode',
         payload: {
-          description: inp.error?.message || 'Session error',
-          error: inp.error,
+          description: input.error?.message || 'Session error',
+          error: input.error,
         },
         timestamp: Date.now(),
       };

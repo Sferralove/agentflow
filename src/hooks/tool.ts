@@ -2,6 +2,7 @@ import type { AgentEvent } from '../types.js';
 import type { PluginStore } from '../store/index.js';
 import type { PluginContainer } from '../plugin-container.js';
 import { generateId } from '../util/id.js';
+import { isToolInput, isToolOutput, asString, asOptionalString } from '../util/guards.js';
 
 function toolToAgent(tool: string, args?: Record<string, unknown>): string {
   if (args?.agent && typeof args.agent === 'string') return args.agent;
@@ -26,30 +27,21 @@ function toolToAgent(tool: string, args?: Record<string, unknown>): string {
   return 'opencode';
 }
 
-interface ToolInput {
-  tool: string;
-  args?: Record<string, unknown>;
-}
-
-interface ToolOutput {
-  result?: string;
-  error?: string;
-}
-
 export function createToolHooks(store: PluginStore, container: PluginContainer) {
 
   return {
     'tool.execute.before': async (input: unknown) => {
-      const inp = input as ToolInput;
+      if (!isToolInput(input)) return;
       if (!container.sessionId) return;
 
-      const agent = toolToAgent(inp.tool, inp.args);
+      const { tool, args } = input;
+      const agent = toolToAgent(tool, args);
 
       // Push onto FIFO stack for this tool type (handles concurrent executions)
-      if (!container.inFlight.has(inp.tool)) {
-        container.inFlight.set(inp.tool, []);
+      if (!container.inFlight.has(tool)) {
+        container.inFlight.set(tool, []);
       }
-      container.inFlight.get(inp.tool)!.push({ agent, startedAt: Date.now() });
+      container.inFlight.get(tool)!.push({ agent, startedAt: Date.now() });
 
       const event: AgentEvent = {
         id: generateId(),
@@ -57,9 +49,9 @@ export function createToolHooks(store: PluginStore, container: PluginContainer) 
         type: 'task',
         agent,
         payload: {
-          action: inp.tool,
-          description: `Executing: ${inp.tool}`,
-          args: inp.args || {},
+          action: tool,
+          description: `Executing: ${tool}`,
+          args: args || {},
         },
         timestamp: Date.now(),
       };
@@ -67,8 +59,8 @@ export function createToolHooks(store: PluginStore, container: PluginContainer) 
       await store.addEvent(event);
 
       // Detect task delegations
-      if (inp.tool === 'task' || inp.tool === 'todowrite') {
-        const subagent = inp.args?.subagent_type as string | undefined;
+      if (tool === 'task' || tool === 'todowrite') {
+        const subagent = asOptionalString(args?.subagent_type);
         if (subagent) {
           const dispatchEvent: AgentEvent = {
             id: generateId(),
@@ -77,7 +69,7 @@ export function createToolHooks(store: PluginStore, container: PluginContainer) 
             agent: 'opencode',
             targetAgent: subagent,
             payload: {
-              reason: (inp.args?.description as string) || `Dispatch to ${subagent}`,
+              reason: asString(args?.description, `Dispatch to ${subagent}`),
             },
             timestamp: Date.now(),
           };
@@ -86,8 +78,8 @@ export function createToolHooks(store: PluginStore, container: PluginContainer) 
       }
 
       // Detect skill loading
-      if (inp.tool === 'skill') {
-        const skillName = inp.args?.name as string | undefined;
+      if (tool === 'skill') {
+        const skillName = asOptionalString(args?.name);
         if (skillName && skillName !== 'agent-flow') {
           const skillEvent: AgentEvent = {
             id: generateId(),
@@ -106,27 +98,29 @@ export function createToolHooks(store: PluginStore, container: PluginContainer) 
     },
 
     'tool.execute.after': async (input: unknown, output: unknown) => {
-      const inp = input as ToolInput;
-      const out = output as ToolOutput;
+      if (!isToolInput(input)) return;
+      if (!isToolOutput(output)) return;
       if (!container.sessionId) return;
 
-      // Pop from FIFO stack (shift = oldest first)
-      const stack = container.inFlight.get(inp.tool);
-      const flight = stack?.shift();
-      if (stack?.length === 0) container.inFlight.delete(inp.tool);
+      const { tool, args } = input;
 
-      const agent = flight?.agent || toolToAgent(inp.tool, inp.args);
+      // Pop from FIFO stack (shift = oldest first)
+      const stack = container.inFlight.get(tool);
+      const flight = stack?.shift();
+      if (stack?.length === 0) container.inFlight.delete(tool);
+
+      const agent = flight?.agent || toolToAgent(tool, args);
       const duration = flight ? Date.now() - flight.startedAt : 0;
 
-      if (out?.error) {
+      if (output.error) {
         const event: AgentEvent = {
           id: generateId(),
           sessionId: container.sessionId,
           type: 'error',
           agent,
           payload: {
-            action: inp.tool,
-            description: out.error,
+            action: tool,
+            description: output.error,
             duration,
           },
           timestamp: Date.now(),
@@ -139,10 +133,10 @@ export function createToolHooks(store: PluginStore, container: PluginContainer) 
           type: 'complete',
           agent,
           payload: {
-            action: inp.tool,
-            description: `Completed: ${inp.tool}`,
+            action: tool,
+            description: `Completed: ${tool}`,
             duration,
-            result: typeof out?.result === 'string' ? out.result.slice(0, 200) : undefined,
+            result: typeof output?.result === 'string' ? output.result.slice(0, 200) : undefined,
           },
           timestamp: Date.now(),
         };
