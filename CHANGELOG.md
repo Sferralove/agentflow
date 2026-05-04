@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0] — 2026-05-04
+
+### Added
+- **Real-time dashboard** — React + xyflow flow graph, live event timeline, stats bar, session selector
+- **WebSocket broadcast** — subscribe per-session, receive events as they happen
+- **REST API** — `GET /api/sessions`, `GET /api/events/:sessionId` (localhost only)
+- **Secrets redaction** — API keys, Bearer tokens, passwords, JWT, connection strings automatically scrubbed
+- **Error sanitization** — stack traces and internal paths stripped from error payloads
+- **File permissions** — session files created with `0600`
+- **CI/CD pipeline** — GitHub Actions: test on Node 18/20/22, npm publish on tag `v*`
+- Professional README with full documentation
+
+### Security
+- Dashboard server binds `localhost`/`127.0.0.1`/`[::1]` only
+- WebSocket `verifyClient` + REST `remoteAddress` ACL — unspoofable
+- Data never leaves disk — no telemetry, no cloud
+
 ## [0.2.0] — 2026-05-04
 
 ### Changed

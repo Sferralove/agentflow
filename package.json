@@ -1,6 +1,6 @@
 {
   "name": "agent-flow-plugin",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "OpenCode plugin for automatic agent flow monitoring — no agent cooperation needed",
   "type": "module",
   "main": "dist/index.js",
