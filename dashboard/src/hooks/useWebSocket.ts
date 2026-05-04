@@ -29,9 +29,9 @@ export function useWebSocket(): UseWebSocketReturn {
           setSessions(msg.sessions);
         }
         if (msg.type === 'event' && msg.event) {
-          setEvents(prev => [...prev, { ...msg.event!, timestamp: msg.event!.timestamp || Date.now() }]);
+          setEvents(prev => [...prev.slice(-999), msg.event!]);
         }
-      } catch {}
+      } catch { /* ignore malformed messages */ }
     };
 
     wsRef.current = ws;

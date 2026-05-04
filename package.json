@@ -9,9 +9,9 @@
     "dist/"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && cd dashboard && npm run build",
-    "build:dashboard": "cd dashboard && npm run build",
-    "dev:dashboard": "cd dashboard && npm run dev",
+    "build": "tsc -p tsconfig.json && npm -C dashboard run build",
+    "build:dashboard": "npm -C dashboard run build",
+    "dev:dashboard": "npm -C dashboard run dev",
     "prepublishOnly": "npm run build",
     "test": "find src -name '*.test.ts' -exec tsx --test {} +",
     "lint": "eslint src/"

@@ -1,15 +1,15 @@
 import { memo } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type Node } from '@xyflow/react';
 
-interface AgentNodeData {
+interface AgentNodeData extends Record<string, unknown> {
   label: string;
   eventCount: number;
   errorCount: number;
   isActive: boolean;
 }
 
-function AgentNodeComponent({ data }: NodeProps) {
-  const nodeData = data as unknown as AgentNodeData;
+function AgentNodeComponent({ data }: { data: AgentNodeData }) {
+  const nodeData = data;
   return (
     <div className={`
       px-3 py-2 rounded-lg border-2 shadow-lg text-xs font-mono
