@@ -1,10 +1,32 @@
 import express from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
 import fs from 'fs';
 import type { AgentEvent, DashboardConfig } from './types.js';
 import type { PluginStore } from './store/index.js';
+
+/** Only allow access from localhost — prevents data exfiltration by 3rd-party browser tabs */
+function isLocalhostOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return url.hostname === 'localhost'
+      || url.hostname === '127.0.0.1'
+      || url.hostname === '[::1]';
+  } catch {
+    return false;
+  }
+}
+
+/** Express middleware that rejects non-localhost requests */
+function localhostOnly(req: Request, res: Response, next: NextFunction): void {
+  const host = req.hostname || '';
+  if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') {
+    return next();
+  }
+  res.status(403).json({ error: 'access denied — localhost only' });
+}
 
 export class DashboardServer {
   private app: express.Application;
@@ -19,6 +41,9 @@ export class DashboardServer {
     this.config = config;
 
     this.app = express();
+
+    // Security: reject non-localhost requests on all routes
+    this.app.use(localhostOnly);
 
     // API: list sessions
     this.app.get('/api/sessions', (_req, res) => {
@@ -35,7 +60,7 @@ export class DashboardServer {
   serveStatic(dashboardPath: string): void {
     if (!fs.existsSync(dashboardPath)) return;
     this.app.use(express.static(dashboardPath));
-    // SPA fallback
+    // SPA fallback (also behind localhostOnly middleware)
     this.app.get('*', (_req, res) => {
       const indexPath = path.join(dashboardPath, 'index.html');
       if (fs.existsSync(indexPath)) res.sendFile(indexPath);
@@ -46,7 +71,14 @@ export class DashboardServer {
   /** Start the server */
   start(): void {
     this.server = http.createServer(this.app);
-    this.wss = new WebSocketServer({ server: this.server });
+
+    this.wss = new WebSocketServer({
+      server: this.server,
+      verifyClient: (info: { origin: string }) => {
+        // Reject WebSocket connections from non-localhost origins
+        return isLocalhostOrigin(info.origin);
+      },
+    });
 
     this.wss.on('connection', (ws: WebSocket) => {
       // Send initial session list
