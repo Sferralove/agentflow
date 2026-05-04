@@ -11,6 +11,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import type { Logger, DashboardConfig } from './types.js';
 import { PluginStore } from './store/index.js';
 import { PluginContainer } from './plugin-container.js';
@@ -52,8 +53,10 @@ export const AgentFlowPlugin = async ({
   const server = new DashboardServer(store, config);
   const broadcast = (event: import('./types.js').AgentEvent) => server.broadcast(event);
 
-  // Dashboard static files path
-  const dashboardPath = path.join(directory, 'dist', 'dashboard');
+  // Dashboard static files path (relative to plugin install dir, not cwd)
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const dashboardPath = path.join(__dirname, 'dashboard');
   server.serveStatic(dashboardPath);
 
   const sessionHooks = createSessionHook(store, container, broadcast);
