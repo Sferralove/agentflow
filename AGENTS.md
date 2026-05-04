@@ -1,31 +1,68 @@
 # Agent Flow Plugin — OpenCode agent monitor
 
-Automatic agent/subagent activity monitor. Hooks into OpenCode events, writes JSON to `.agent-flow/data/`. Zero agent cooperation needed.
+Automatic agent/subagent activity monitor + real-time React dashboard. Hooks into OpenCode events, writes JSON to `.agent-flow/data/`. Zero agent cooperation needed.
 
-## Quick install
+## Quick install (local plugin)
 
 ```bash
 mkdir -p .opencode/plugins/agent-flow
-cp src/index.ts .opencode/plugins/agent-flow/
-cp -r src/hooks src/store src/tools src/types.ts .opencode/plugins/agent-flow/
 cp package.json .opencode/plugins/agent-flow/
+cp -r src/ .opencode/plugins/agent-flow/
+cd .opencode/plugins/agent-flow && npm install --production
+```
+
+**Important:** `npm install` is required — the plugin now has runtime dependencies (express, ws).
+
+## npm install (published)
+
+```bash
+# opencode.json
+{ "plugins": ["agent-flow-plugin"] }
 ```
 
 ## Build
 
 ```bash
 npm install
-npm run build    # tsc -p tsconfig.json
+npm run build    # tsc + vite (plugin + dashboard)
 ```
 
-**Build output:** Compiled `.js`/`.d.ts` go to `dist/` (e.g. `src/hooks/session.ts` → `dist/hooks/session.js`). The `package.json` `files` array ships only `dist/`.
+**Build output:**
+- `dist/` — compiled plugin JS (entry: `dist/index.js`)
+- `dist/dashboard/` — static React dashboard (served by plugin server at runtime)
+
+## Dashboard
+
+The plugin starts an HTTP + WebSocket server on port 3001 (configurable). Open `http://localhost:3001` to see:
+
+- **Flow Graph** — reactflow canvas showing agents as nodes, dispatch delegations as edges
+- **Timeline** — real-time scrollable event list, color-coded by type
+- **Session selector** — switch between monitored sessions via dropdown or `?session=` URL param
+
+### Configuration
+
+`.agent-flow/config.json`:
+```json
+{
+  "version": "0.2.0",
+  "dataDir": ".agent-flow/data",
+  "dashboard": {
+    "port": 3001,
+    "host": "localhost"
+  }
+}
+```
+
+### Security
+
+Dashboard server only accepts connections from `localhost` / `127.0.0.1` / `[::1]`. External browser tabs cannot access agent activity data.
 
 ## Plugin API shape
 
 Plugin factory exported from `src/index.ts`:
 
 ```
-AgentFlowPlugin({ directory }): {
+AgentFlowPlugin({ directory, logger? }): {
   'session.created': hook,
   'session.idle': hook,
   'session.error': hook,
@@ -40,7 +77,7 @@ AgentFlowPlugin({ directory }): {
 
 `start` | `complete` | `dispatch` | `task` | `error` | `message`
 
-Each event written atomically (tmp file + rename) to `.agent-flow/data/{sessionId}.json` as an `events[]` array.
+Each event written atomically (tmp file + rename) to `.agent-flow/data/{sessionId}.json` as an `events[]` array. Events are also broadcast in real-time via WebSocket to the dashboard.
 
 ## Tool-to-agent mapping (flow graph)
 
@@ -80,8 +117,10 @@ Result payloads are truncated: `result` string at 200 chars, message content at 
 ## Gotchas
 
 - **Peer dependency:** `@opencode-ai/plugin` — provided by OpenCode runtime, not installed here
-- **Storage:** local JSON files only — no external database, no server
+- **Runtime deps:** `express`, `ws` — required by dashboard server, installed via `npm install`
+- **Storage:** local JSON files only — no external database
 - **Atomic writes:** `writeFileSync` to `.tmp` then `renameSync` — safe against partial writes
-- **`.agent-flow/config.json`** contains plugin configuration
+- **Port conflict:** if port 3001 is in use, dashboard server logs error but monitoring continues unaffected
 - **Message dedup:** assistant messages logged once per ID via `Set`
 - **Skill loading:** tool `skill` with `name !== 'agent-flow'` logged as `message` type event, not `task`
+- **Event cap:** dashboard keeps max 1000 events in memory, older events still on disk
