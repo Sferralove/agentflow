@@ -23,7 +23,7 @@ describe('createSessionHook', () => {
   });
 
   it('logs session.created event and sets sessionId', async () => {
-    const hooks = createSessionHook(store, container);
+    const hooks = createSessionHook(store, container, undefined);
     await hooks['session.created']({ session: { id: 'abc', title: 'test-session' } });
     assert.equal(container.sessionId, 'abc');
     const events = store.getEvents('abc');
@@ -33,13 +33,13 @@ describe('createSessionHook', () => {
   });
 
   it('generates sessionId if none provided', async () => {
-    const hooks = createSessionHook(store, container);
+    const hooks = createSessionHook(store, container, undefined);
     await hooks['session.created']({});
     assert.ok(container.sessionId?.startsWith('session-'));
   });
 
   it('logs session.idle event and clears sessionId', async () => {
-    const hooks = createSessionHook(store, container);
+    const hooks = createSessionHook(store, container, undefined);
     container.sessionId = 'idle-test';
     await hooks['session.idle']();
     const events = store.getEvents('idle-test');
@@ -50,14 +50,14 @@ describe('createSessionHook', () => {
   });
 
   it('does nothing on session.idle when no session', async () => {
-    const hooks = createSessionHook(store, container);
+    const hooks = createSessionHook(store, container, undefined);
     container.sessionId = null;
     // Should not throw
     await hooks['session.idle']();
   });
 
   it('logs session.error event', async () => {
-    const hooks = createSessionHook(store, container);
+    const hooks = createSessionHook(store, container, undefined);
     container.sessionId = 'err-test';
     await hooks['session.error']({ error: { message: 'something broke' } });
     const events = store.getEvents('err-test');
@@ -67,7 +67,7 @@ describe('createSessionHook', () => {
   });
 
   it('handles session.error with no message', async () => {
-    const hooks = createSessionHook(store, container);
+    const hooks = createSessionHook(store, container, undefined);
     container.sessionId = 'err-test-2';
     await hooks['session.error']({});
     const events = store.getEvents('err-test-2');

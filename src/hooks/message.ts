@@ -1,10 +1,10 @@
-import type { AgentEvent } from '../types.js';
+import type { AgentEvent, EventBroadcaster } from '../types.js';
 import type { PluginStore } from '../store/index.js';
 import type { PluginContainer } from '../plugin-container.js';
 import { generateId } from '../util/id.js';
 import { isMessageInput } from '../util/guards.js';
 
-export function createMessageHooks(store: PluginStore, container: PluginContainer) {
+export function createMessageHooks(store: PluginStore, container: PluginContainer, broadcast?: EventBroadcaster) {
   return {
     'message.updated': async (input: unknown) => {
       if (!isMessageInput(input)) return;
@@ -33,6 +33,7 @@ export function createMessageHooks(store: PluginStore, container: PluginContaine
       };
 
       await store.addEvent(event);
+      broadcast?.(event);
     },
   };
 }

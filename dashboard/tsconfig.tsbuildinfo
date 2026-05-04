@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/components/agentnode.tsx","./src/components/eventrow.tsx","./src/components/flowgraph.tsx","./src/components/sessionselector.tsx","./src/components/statsbar.tsx","./src/components/timeline.tsx","./src/hooks/usewebsocket.ts"],"version":"5.8.3"}

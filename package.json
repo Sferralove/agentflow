@@ -9,7 +9,9 @@
     "dist/"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && npm -C dashboard run build",
+    "build:dashboard": "npm -C dashboard run build",
+    "dev:dashboard": "npm -C dashboard run dev",
     "prepublishOnly": "npm run build",
     "test": "find src -name '*.test.ts' -exec tsx --test {} +",
     "lint": "eslint src/"
@@ -33,7 +35,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
     "eslint": "^10.3.0",
     "tsx": "^4.21.0",
     "typescript": "^5.6.0",
@@ -45,5 +49,9 @@
     "monitoring",
     "agent-flow"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.2.1",
+    "ws": "^8.20.0"
+  }
 }

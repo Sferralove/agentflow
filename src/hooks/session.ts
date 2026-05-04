@@ -1,10 +1,10 @@
-import type { AgentEvent } from '../types.js';
+import type { AgentEvent, EventBroadcaster } from '../types.js';
 import type { PluginStore } from '../store/index.js';
 import type { PluginContainer } from '../plugin-container.js';
 import { generateId } from '../util/id.js';
 import { isSessionCreatedInput, isSessionErrorInput } from '../util/guards.js';
 
-export function createSessionHook(store: PluginStore, container: PluginContainer) {
+export function createSessionHook(store: PluginStore, container: PluginContainer, broadcast?: EventBroadcaster) {
   return {
     'session.created': async (input: unknown) => {
       if (!isSessionCreatedInput(input)) return;
@@ -25,6 +25,7 @@ export function createSessionHook(store: PluginStore, container: PluginContainer
       };
 
       await store.addEvent(event);
+      broadcast?.(event);
     },
 
     'session.idle': async () => {
@@ -43,6 +44,7 @@ export function createSessionHook(store: PluginStore, container: PluginContainer
       };
 
       await store.addEvent(event);
+      broadcast?.(event);
       container.sessionId = null;
     },
 
@@ -63,6 +65,7 @@ export function createSessionHook(store: PluginStore, container: PluginContainer
       };
 
       await store.addEvent(event);
+      broadcast?.(event);
     },
   };
 }
