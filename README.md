@@ -1,10 +1,10 @@
 # Agent Flow Plugin
 
 <p align="center">
-  <img src="https://img.shields.io/npm/v/agent-flow-plugin?color=emerald" alt="npm version" />
+  <img src="https://img.shields.io/npm/v/@sferralove/agent-flow-plugin?color=emerald" alt="npm version" />
   <img src="https://img.shields.io/github/actions/workflow/status/angelosferra/agent-flow-plugin/ci.yml?branch=main" alt="CI" />
-  <img src="https://img.shields.io/node/v/agent-flow-plugin" alt="node" />
-  <img src="https://img.shields.io/npm/l/agent-flow-plugin" alt="license" />
+  <img src="https://img.shields.io/node/v/@sferralove/agent-flow-plugin" alt="node" />
+  <img src="https://img.shields.io/npm/l/@sferralove/agent-flow-plugin" alt="license" />
 </p>
 
 > **Zero-touch agent monitoring & real-time flow visualization for OpenCode.**
@@ -64,7 +64,7 @@ and streamed in real-time via WebSocket to a React dashboard.
 
 ```json
 // opencode.json
-{ "plugins": ["agent-flow-plugin"] }
+{ "plugins": ["@sferralove/agent-flow-plugin"] }
 ```
 
 OpenCode will install the plugin automatically on next start.
@@ -139,7 +139,7 @@ Create `.agent-flow/config.json` in your project root (optional — defaults sho
 Plugins built on the Agent Flow plugin factory can be composed with other OpenCode plugins.
 
 ```ts
-import { AgentFlowPlugin } from 'agent-flow-plugin';
+import { AgentFlowPlugin } from '@sferralove/agent-flow-plugin';
 
 const plugin = await AgentFlowPlugin({
   directory: '/path/to/project',

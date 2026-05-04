@@ -17,7 +17,7 @@ cd .opencode/plugins/agent-flow && npm install --production
 
 ```bash
 # opencode.json
-{ "plugins": ["agent-flow-plugin"] }
+{ "plugins": ["@sferralove/agent-flow-plugin"] }
 ```
 
 ## Build
