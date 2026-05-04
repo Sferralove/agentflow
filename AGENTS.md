@@ -2,24 +2,6 @@
 
 Automatic agent/subagent activity monitor + real-time React dashboard. Hooks into OpenCode events, writes JSON to `.agent-flow/data/`. Zero agent cooperation needed.
 
-## Quick install (local plugin)
-
-```bash
-mkdir -p .opencode/plugins/agent-flow
-cp package.json .opencode/plugins/agent-flow/
-cp -r src/ .opencode/plugins/agent-flow/
-cd .opencode/plugins/agent-flow && npm install --production
-```
-
-**Important:** `npm install` is required — the plugin now has runtime dependencies (express, ws).
-
-## npm install (published)
-
-```bash
-# opencode.json
-{ "plugins": ["@sferralove/agent-flow-plugin"] }
-```
-
 ## Build
 
 ```bash
@@ -30,6 +12,37 @@ npm run build    # tsc + vite (plugin + dashboard)
 **Build output:**
 - `dist/` — compiled plugin JS (entry: `dist/index.js`)
 - `dist/dashboard/` — static React dashboard (served by plugin server at runtime)
+
+## npm install (published)
+
+```bash
+npm install @sferralove/agent-flow-plugin
+```
+
+**opencode.json** (nella root del progetto target):
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["@sferralove/agent-flow-plugin"]
+}
+```
+
+OpenCode scarica automaticamente il pacchetto + dipendenze in `~/.cache/opencode/packages/`. \
+**Devi lanciare `opencode` dalla directory del progetto** per far sì che legga `opencode.json`.
+
+## Quick install (local plugin, dev)
+
+Solo per sviluppare il plugin stesso (non per progetti esterni):
+
+```bash
+npm run build
+mkdir -p .opencode/plugins/agent-flow
+cp package.json .opencode/plugins/agent-flow/
+cp -r dist/ .opencode/plugins/agent-flow/
+cd .opencode/plugins/agent-flow && npm install --production
+```
+
+**Nota:** `npm run build` DEVE essere eseguito prima — il plugin necessita di compilazione TypeScript + build dashboard Vite. `dist/` contiene tutto il necessario per il runtime (JS compilato, non TS).
 
 ## Dashboard
 

@@ -61,7 +61,7 @@ export class DashboardServer {
     if (!fs.existsSync(dashboardPath)) return;
     this.app.use(express.static(dashboardPath));
     // SPA fallback (also behind localhostOnly middleware)
-    this.app.get('*catch', (_req, res) => {
+    this.app.get('*', (_req, res) => {
       const indexPath = path.join(dashboardPath, 'index.html');
       if (fs.existsSync(indexPath)) res.sendFile(indexPath);
       else res.status(404).send('Dashboard not built. Run: cd dashboard && npm run build');
