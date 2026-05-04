@@ -74,9 +74,14 @@ export class DashboardServer {
 
     this.wss = new WebSocketServer({
       server: this.server,
-      verifyClient: (info: { origin: string }) => {
-        // Reject WebSocket connections from non-localhost origins
-        return isLocalhostOrigin(info.origin);
+      verifyClient: (info: { origin: string; req: http.IncomingMessage }) => {
+        // Allow if origin is localhost (browser) or if origin is empty and host is localhost (non-browser dev clients)
+        if (isLocalhostOrigin(info.origin)) return true;
+        if (!info.origin) {
+          const host = info.req.headers.host || '';
+          return host.startsWith('localhost:') || host.startsWith('127.0.0.1:') || host.startsWith('[::1]:');
+        }
+        return false;
       },
     });
 
