@@ -1,0 +1,21 @@
+{
+  "name": "agent-flow-plugin",
+  "version": "0.1.0",
+  "description": "OpenCode plugin for automatic agent flow monitoring — no agent cooperation needed",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "hooks/",
+    "store/",
+    "types/",
+    "tools/"
+  ],
+  "peerDependencies": {
+    "@opencode-ai/plugin": "*"
+  },
+  "keywords": ["opencode", "plugin", "monitoring", "agent-flow"],
+  "license": "MIT"
+}

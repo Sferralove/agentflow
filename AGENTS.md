@@ -2,7 +2,33 @@
 
 ## Project identity
 
-Agent Flow — per-project monitoring tool for OpenCode agent/subagent workflows. Real-time flow graph via MCP tools + WebSocket + React dashboard. HTTP API available as fallback.
+Agent Flow — per-project monitoring tool for OpenCode agent/subagent workflows.
+Two deployment modes:
+
+| Mode | Branch | How it works |
+|------|--------|-------------|
+| **Skill + MCP** | `master` | Agents explicitly call `send_event` — cooperative, precise |
+| **Plugin** | `Plugin` | Hooks into OpenCode events — automatic, zero agent cooperation |
+
+Both share the same storage format (`.agent-flow/data/{sessionId}.json`) and dashboard (ReactFlow on :3001).
+
+## Plugin mode (`Plugin` branch)
+
+```bash
+# 1. Add to opencode.json
+{
+  "plugin": ["agent-flow-plugin"]
+}
+
+# 2. Start dashboard
+npx agent-flow serve
+
+# Done. Everything auto-logged.
+```
+
+**How it works:** The plugin hooks into `session.created`, `tool.execute.before/after`, `message.updated` — capturing ALL agent activity without agents needing to know. Writes to `.agent-flow/data/` for the existing dashboard.
+
+**Plugin directory:** `plugin/` — separate npm package `agent-flow-plugin`.
 
 ## Install & run
 
