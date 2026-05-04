@@ -31,7 +31,7 @@ export const AgentFlowPlugin = async ({
   const log = logger ?? console;
 
   const sessionHooks = createSessionHook(store, container);
-  const toolHooks = createToolHooks(store, container, logger);
+  const toolHooks = createToolHooks(store, container);
   const messageHooks = createMessageHooks(store, container);
   const tools = createTools(store);
 

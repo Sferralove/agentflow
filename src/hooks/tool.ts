@@ -1,4 +1,4 @@
-import type { AgentEvent, Logger } from '../types.js';
+import type { AgentEvent } from '../types.js';
 import type { PluginStore } from '../store/index.js';
 import type { PluginContainer } from '../plugin-container.js';
 import { generateId } from '../util/id.js';
@@ -36,8 +36,7 @@ interface ToolOutput {
   error?: string;
 }
 
-export function createToolHooks(store: PluginStore, container: PluginContainer, logger?: Logger) {
-  const log = logger ?? console;
+export function createToolHooks(store: PluginStore, container: PluginContainer) {
 
   return {
     'tool.execute.before': async (input: unknown) => {

@@ -136,7 +136,7 @@ describe('createToolHooks', () => {
     const events = store.getEvents('tool-test').slice(beforeCount);
     const complete = events.find(e => e.type === 'complete');
     assert.ok(complete, 'Should have logged a complete event');
-    assert.ok(complete?.payload.result?.length! <= 200);
+    assert.ok(complete!.payload.result!.length <= 200);
   });
 
   it('handles FIFO stack for concurrent same-tool calls', async () => {
