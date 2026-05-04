@@ -17,3 +17,9 @@ export interface PluginContext {
   directory: string;
   worktree?: string;
 }
+
+export interface Logger {
+  info: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+}
