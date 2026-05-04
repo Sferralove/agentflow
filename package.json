@@ -1,43 +1,13 @@
 {
-  "name": "agent-flow",
-  "version": "0.1.0",
-  "description": "Agent/Subagent flow monitoring tool for OpenCode",
-  "main": "dist/server.js",
-  "files": [
-    "dist/",
-    "skills/"
+  "private": true,
+  "workspaces": [
+    "server",
+    "plugin"
   ],
-  "bin": {
-    "agent-flow": "dist/cli/index.js",
-    "agent-flow-mcp": "dist/mcp/stdio.js"
-  },
   "scripts": {
-    "build": "tsc && (cd frontend && npm run build || true) && mkdir -p dist/public && cp -r frontend/dist/* dist/public/",
-    "build:frontend": "cd frontend && npm run build",
-    "dev": "tsc --watch & node dist/cli/index.js serve & cd frontend && npm run dev",
-    "dev:backend": "tsc --watch",
-    "dev:ui": "cd frontend && npm run dev",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint src/",
-    "start": "node dist/cli/index.js"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "commander": "^12.0.0",
-    "express": "^4.21.0",
-    "uuid": "^10.0.0",
-    "ws": "^8.18.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "devDependencies": {
-    "@types/express": "^5.0.0",
-    "@types/node": "^22.0.0",
-    "@types/uuid": "^10.0.0",
-    "@types/ws": "^8.5.0",
-    "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "build": "npm run build -w server",
+    "build:plugin": "npm run build -w plugin",
+    "test": "npm run test -w server",
+    "dev": "npm run dev -w server"
   }
 }

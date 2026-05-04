@@ -2,6 +2,8 @@ node_modules/
 .agent-flow/
 .DS_Store
 *.tgz
-tests/test-data/
-frontend/node_modules/
-frontend/dist/
+.opencode/
+server/tests/test-data/
+server/frontend/node_modules/
+server/frontend/dist/
+plugin/node_modules/
