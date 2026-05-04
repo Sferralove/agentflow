@@ -1,54 +1,87 @@
-# AGENTS.md
+# Agent Flow Plugin — OpenCode agent monitor
 
-## Project identity
+Automatic agent/subagent activity monitor. Hooks into OpenCode events, writes JSON to `.agent-flow/data/`. Zero agent cooperation needed.
 
-Agent Flow Plugin — OpenCode plugin for automatic agent/subagent monitoring.
-Zero agent cooperation. Hooks into OpenCode events, writes to `.agent-flow/data/`.
-
-## Install
+## Quick install
 
 ```bash
-# Local plugin (instant)
 mkdir -p .opencode/plugins/agent-flow
 cp src/index.ts .opencode/plugins/agent-flow/
 cp -r src/hooks src/store src/tools src/types.ts .opencode/plugins/agent-flow/
 cp package.json .opencode/plugins/agent-flow/
 ```
 
-## Structure
-
-```
-src/
-├── index.ts          # AgentFlowPlugin export
-├── types.ts          # AgentEvent, PluginContext
-├── hooks/            # session, tool, message hooks
-├── store/            # PluginStore — writes .agent-flow/data/
-└── tools/            # agentflow_events, _sessions, _stats
-```
-
 ## Build
 
 ```bash
 npm install
-npx tsc -p tsconfig.json
+npm run build    # tsc -p tsconfig.json
 ```
 
-Output goes to root: `index.js`, `hooks/*.js`, `store/*.js`, `tools/*.js`, `types.js`.
+**Build quirk:** `tsconfig.json` has `outDir: "."` and `rootDir: "src"`. Compiled `.js`/`.d.ts` land next to source in project root (e.g. `src/hooks/session.ts` → `hooks/session.js`). The `package.json` `files` array ships only the compiled output.
 
-## How it works
+## Plugin API shape
 
-1. Copy to `.opencode/plugins/agent-flow/` (project) or `~/.config/opencode/plugins/` (global)
-2. OpenCode auto-discovers the plugin at startup
-3. Plugin hooks into `session.created`, `tool.execute.*`, `message.updated`
-4. Events written to `.agent-flow/data/{sessionId}.json`
-5. No server needed — plugin runs inside OpenCode
+Plugin factory exported from `src/index.ts`:
+
+```
+AgentFlowPlugin({ directory }): {
+  'session.created': hook,
+  'session.idle': hook,
+  'session.error': hook,
+  'tool.execute.before': hook,
+  'tool.execute.after': hook,
+  'message.updated': hook,
+  tool: { agentflow_events, agentflow_sessions, agentflow_stats }
+}
+```
 
 ## Event types logged
 
 `start` | `complete` | `dispatch` | `task` | `error` | `message`
 
+Each event written atomically (tmp file + rename) to `.agent-flow/data/{sessionId}.json` as an `events[]` array.
+
+## Tool-to-agent mapping (flow graph)
+
+Tool executions are mapped to agent identities for flow visualization:
+
+| Tool | Agent identity |
+|------|---------------|
+| `task` | `delegator` |
+| `bash` | `shell` |
+| `read` | `reader` |
+| `write` | `writer` |
+| `edit` | `editor` |
+| `grep` | `searcher` |
+| `glob` | `finder` |
+| `webfetch` | `fetcher` |
+| `skill` | `skill-loader` |
+| `todowrite` | `delegator` |
+| *any other* | `opencode` |
+| *args has `agent`* | overrides the mapped name |
+
+If `args.agent` is a string, it takes precedence over the tool map.
+
+## Subagent detection
+
+When tool is `task` or `todowrite` and `args.subagent_type` is set, a `dispatch` event is logged automatically — no separate hook needed.
+
+## Custom tools (queryable by agents)
+
+| Tool | Returns |
+|------|---------|
+| `agentflow_events(sessionId?, limit?)` | Events for session (or latest across all sessions), sorted newest-first |
+| `agentflow_sessions()` | List of all session IDs + count |
+| `agentflow_stats(sessionId?)` | Event counts by type, by agent, total, error count, time range |
+
+Result payloads are truncated: `result` string at 200 chars, message content at 300 chars.
+
 ## Gotchas
 
-- Plugin requires `@opencode-ai/plugin` (peer dependency — provided by OpenCode)
-- Storage is local JSON files — no external database
-- Atomic writes via tmp file + rename
+- **Peer dependency:** `@opencode-ai/plugin` — provided by OpenCode runtime, not installed here
+- **Storage:** local JSON files only — no external database, no server
+- **Atomic writes:** `writeFileSync` to `.tmp` then `renameSync` — safe against partial writes
+- **`.agent-flow/config.json`** contains `wsPort: 3001` — used by external dashboard
+- **Message dedup:** assistant messages logged once per ID via `Set`
+- **Skill loading:** tool `skill` with `name !== 'agent-flow'` logged as `message` type event, not `task`
