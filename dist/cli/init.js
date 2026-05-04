@@ -99,8 +99,9 @@ function initCommand(program) {
             const mcp = (opencodeConfig.mcp || {});
             if (!mcp['agent-flow']) {
                 mcp['agent-flow'] = {
-                    command: 'npx',
-                    args: ['agent-flow-mcp'],
+                    type: 'local',
+                    command: ['npx', 'agent-flow-mcp'],
+                    enabled: true,
                 };
                 opencodeConfig.mcp = mcp;
                 delete opencodeConfig.$schema;
