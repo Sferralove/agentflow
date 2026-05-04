@@ -62,8 +62,12 @@ export const AgentFlowPlugin = async ({
   const messageHooks = createMessageHooks(store, container, broadcast);
   const tools = createTools(store);
 
-  // Start server (non-blocking)
-  server.start();
+  // Start server (non-blocking, failures handled internally)
+  try {
+    server.start();
+  } catch (err) {
+    log.error('[agent-flow] Failed to start dashboard server:', err);
+  }
 
   log.info('[agent-flow] Plugin loaded — monitoring all activity');
   log.info(`[agent-flow] Data directory: ${directory}/.agent-flow/data/`);

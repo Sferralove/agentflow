@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -12,6 +12,7 @@ import type { AgentEvent } from '../types';
 import AgentNode from './AgentNode';
 
 const nodeTypes = { agentNode: AgentNode };
+const INITIAL_GRAPH = { nodes: [] as Node[], edges: [] as Edge[] };
 
 function buildGraph(events: AgentEvent[]): { nodes: Node[]; edges: Edge[] } {
   const agentCounts = new Map<string, { total: number; errors: number; lastTs: number }>();
@@ -57,9 +58,8 @@ function buildGraph(events: AgentEvent[]): { nodes: Node[]; edges: Edge[] } {
   }));
 
   // Build edges
-  let edgeId = 0;
-  const edges: Edge[] = Array.from(dispatchEdges.values()).map(e => ({
-    id: `e${edgeId++}`,
+  const edges: Edge[] = Array.from(dispatchEdges.values()).map((e, i) => ({
+    id: `e${i}`,
     source: e.source,
     target: e.target,
     animated: true,
@@ -71,8 +71,41 @@ function buildGraph(events: AgentEvent[]): { nodes: Node[]; edges: Edge[] } {
   return { nodes, edges };
 }
 
+/**
+ * Debounced graph builder — limits rebuilds to prevent jank at high event rates.
+ * Rebuilds immediately if >800ms since last rebuild, otherwise waits 300ms of silence.
+ */
+function useDebouncedGraph(events: AgentEvent[]) {
+  const [graph, setGraph] = useState(INITIAL_GRAPH);
+  const lastRebuild = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    const now = Date.now();
+    const since = now - lastRebuild.current;
+
+    clearTimeout(timer.current);
+
+    if (since > 800) {
+      // Fast path: enough time since last rebuild, rebuild now
+      setGraph(buildGraph(events));
+      lastRebuild.current = now;
+    } else {
+      // Slow path: debounce — wait for quiet period
+      timer.current = setTimeout(() => {
+        setGraph(buildGraph(events));
+        lastRebuild.current = Date.now();
+      }, 300);
+    }
+
+    return () => clearTimeout(timer.current);
+  }, [events]);
+
+  return graph;
+}
+
 export default function FlowGraph({ events }: { events: AgentEvent[] }) {
-  const graph = useMemo(() => buildGraph(events), [events]);
+  const graph = useDebouncedGraph(events);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">

@@ -13,14 +13,32 @@ export function useWebSocket(): UseWebSocketReturn {
   const [sessions, setSessions] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectAttempt = useRef(0);
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const currentSession = useRef<string | null>(null);
 
-  useEffect(() => {
+  const connect = useCallback(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     const ws = new WebSocket(`${protocol}//${host}`);
 
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
+    ws.onopen = () => {
+      setConnected(true);
+      reconnectAttempt.current = 0;
+      // Re-subscribe to current session after reconnect
+      if (currentSession.current) {
+        ws.send(JSON.stringify({ type: 'subscribe', sessionId: currentSession.current }));
+      }
+    };
+
+    ws.onclose = () => {
+      setConnected(false);
+      // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s cap
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempt.current), 30000);
+      reconnectAttempt.current++;
+      clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = setTimeout(connect, delay);
+    };
 
     ws.onmessage = (e) => {
       try {
@@ -35,13 +53,18 @@ export function useWebSocket(): UseWebSocketReturn {
     };
 
     wsRef.current = ws;
-
-    return () => {
-      ws.close();
-    };
   }, []);
 
+  useEffect(() => {
+    connect();
+    return () => {
+      clearTimeout(reconnectTimer.current);
+      wsRef.current?.close();
+    };
+  }, [connect]);
+
   const subscribe = useCallback((sessionId: string) => {
+    currentSession.current = sessionId;
     setEvents([]);
     wsRef.current?.send(JSON.stringify({ type: 'subscribe', sessionId }));
   }, []);
