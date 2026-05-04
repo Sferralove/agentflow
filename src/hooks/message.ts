@@ -1,10 +1,7 @@
 import type { AgentEvent } from '../types.js';
 import type { PluginStore } from '../store/index.js';
-import { getCurrentSessionId } from './session.js';
-
-function generateId(): string {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-}
+import type { PluginContainer } from '../plugin-container.js';
+import { generateId } from '../util/id.js';
 
 interface MessageInput {
   message?: {
@@ -14,27 +11,22 @@ interface MessageInput {
   };
 }
 
-export function createMessageHooks(store: PluginStore) {
-  const loggedMessages = new Set<string>();
-
+export function createMessageHooks(store: PluginStore, container: PluginContainer) {
   return {
-    /** Fires when a message is updated (agent response received) */
     'message.updated': async (input: unknown) => {
       const inp = input as MessageInput;
-      const sessionId = getCurrentSessionId();
-      if (!sessionId || !inp.message) return;
+      if (!container.sessionId || !inp.message) return;
 
-      // Only log assistant messages once per ID
       if (inp.message.role !== 'assistant') return;
-      if (loggedMessages.has(inp.message.id)) return;
-      loggedMessages.add(inp.message.id);
+      if (container.loggedMessages.has(inp.message.id)) return;
+      container.loggedMessages.add(inp.message.id);
 
       const content = inp.message.content || '';
       const preview = content.length > 300 ? content.slice(0, 300) + '...' : content;
 
       const event: AgentEvent = {
         id: generateId(),
-        sessionId,
+        sessionId: container.sessionId,
         type: 'message',
         agent: 'opencode',
         payload: {

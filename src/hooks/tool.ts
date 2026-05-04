@@ -1,19 +1,14 @@
-import type { AgentEvent } from '../types.js';
+import type { AgentEvent, Logger } from '../types.js';
 import type { PluginStore } from '../store/index.js';
-import { getCurrentSessionId } from './session.js';
+import type { PluginContainer } from '../plugin-container.js';
+import { generateId } from '../util/id.js';
 
-function generateId(): string {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-}
-
-/** Map tool names to agent identities for the flow graph */
 function toolToAgent(tool: string, args?: Record<string, unknown>): string {
-  // If the tool args have an explicit agent name, use it
   if (args?.agent && typeof args.agent === 'string') return args.agent;
 
-  // Map known tools to agent names
   const toolMap: Record<string, string> = {
-    'task': 'delegator',       // dispatching subagents
+    'task': 'delegator',
+    'todowrite': 'delegator',
     'bash': 'shell',
     'read': 'reader',
     'write': 'writer',
@@ -24,7 +19,6 @@ function toolToAgent(tool: string, args?: Record<string, unknown>): string {
     'skill': 'skill-loader',
   };
 
-  // Check if tool starts with known prefixes
   for (const [prefix, agent] of Object.entries(toolMap)) {
     if (tool.startsWith(prefix)) return agent;
   }
@@ -42,25 +36,25 @@ interface ToolOutput {
   error?: string;
 }
 
-export function createToolHooks(store: PluginStore) {
-  // Track in-flight tool executions
-  const inFlight = new Map<string, { tool: string; agent: string; startedAt: number }>();
+export function createToolHooks(store: PluginStore, container: PluginContainer, logger?: Logger) {
+  const log = logger ?? console;
 
   return {
-    /** Fires BEFORE a tool executes */
     'tool.execute.before': async (input: unknown) => {
       const inp = input as ToolInput;
-      const sessionId = getCurrentSessionId();
-      if (!sessionId) return;
+      if (!container.sessionId) return;
 
       const agent = toolToAgent(inp.tool, inp.args);
-      const executionId = generateId();
 
-      inFlight.set(inp.tool, { tool: inp.tool, agent, startedAt: Date.now() });
+      // Push onto FIFO stack for this tool type (handles concurrent executions)
+      if (!container.inFlight.has(inp.tool)) {
+        container.inFlight.set(inp.tool, []);
+      }
+      container.inFlight.get(inp.tool)!.push({ agent, startedAt: Date.now() });
 
       const event: AgentEvent = {
-        id: executionId,
-        sessionId,
+        id: generateId(),
+        sessionId: container.sessionId,
         type: 'task',
         agent,
         payload: {
@@ -79,7 +73,7 @@ export function createToolHooks(store: PluginStore) {
         if (subagent) {
           const dispatchEvent: AgentEvent = {
             id: generateId(),
-            sessionId,
+            sessionId: container.sessionId,
             type: 'dispatch',
             agent: 'opencode',
             targetAgent: subagent,
@@ -98,7 +92,7 @@ export function createToolHooks(store: PluginStore) {
         if (skillName && skillName !== 'agent-flow') {
           const skillEvent: AgentEvent = {
             id: generateId(),
-            sessionId,
+            sessionId: container.sessionId,
             type: 'message',
             agent: 'opencode',
             payload: {
@@ -112,24 +106,23 @@ export function createToolHooks(store: PluginStore) {
       }
     },
 
-    /** Fires AFTER a tool executes */
     'tool.execute.after': async (input: unknown, output: unknown) => {
       const inp = input as ToolInput;
       const out = output as ToolOutput;
-      const sessionId = getCurrentSessionId();
-      if (!sessionId) return;
+      if (!container.sessionId) return;
 
-      const flight = inFlight.get(inp.tool);
+      // Pop from FIFO stack (shift = oldest first)
+      const stack = container.inFlight.get(inp.tool);
+      const flight = stack?.shift();
+      if (stack?.length === 0) container.inFlight.delete(inp.tool);
+
       const agent = flight?.agent || toolToAgent(inp.tool, inp.args);
       const duration = flight ? Date.now() - flight.startedAt : 0;
 
-      inFlight.delete(inp.tool);
-
       if (out?.error) {
-        // Tool failed
         const event: AgentEvent = {
           id: generateId(),
-          sessionId,
+          sessionId: container.sessionId,
           type: 'error',
           agent,
           payload: {
@@ -141,10 +134,9 @@ export function createToolHooks(store: PluginStore) {
         };
         await store.addEvent(event);
       } else {
-        // Tool succeeded
         const event: AgentEvent = {
           id: generateId(),
-          sessionId,
+          sessionId: container.sessionId,
           type: 'complete',
           agent,
           payload: {
