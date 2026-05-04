@@ -6,8 +6,12 @@ export default function Timeline({ events }: { events: AgentEvent[] }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (el) {
+      const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 50;
+      if (nearBottom || events.length <= 1) {
+        el.scrollTop = el.scrollHeight;
+      }
     }
   }, [events.length]);
 

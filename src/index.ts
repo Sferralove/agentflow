@@ -23,7 +23,6 @@ import { DashboardServer } from './server.js';
 const DEFAULT_CONFIG: DashboardConfig = {
   port: 3001,
   host: 'localhost',
-  autoOpen: false,
 };
 
 function loadConfig(directory: string): DashboardConfig {
@@ -33,7 +32,7 @@ function loadConfig(directory: string): DashboardConfig {
       const raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
       return { ...DEFAULT_CONFIG, ...(raw.dashboard || {}) };
     }
-  } catch {}
+  } catch { /* config parse error, use defaults */ }
   return DEFAULT_CONFIG;
 }
 

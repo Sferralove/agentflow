@@ -27,7 +27,6 @@ export interface Logger {
 export interface DashboardConfig {
   port: number;
   host: string;
-  autoOpen: boolean;
 }
 
 export type EventBroadcaster = (event: AgentEvent) => void;
