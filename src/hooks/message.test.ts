@@ -28,7 +28,7 @@ describe('createMessageHooks', () => {
   });
 
   it('logs assistant messages', async () => {
-    const hooks = createMessageHooks(store, container);
+    const hooks = createMessageHooks(store, container, undefined);
     const beforeCount = store.getEvents('msg-test').length;
     await hooks['message.updated']({
       message: { id: 'm1', role: 'assistant', content: 'hello world' },
@@ -41,7 +41,7 @@ describe('createMessageHooks', () => {
   });
 
   it('skips non-assistant messages', async () => {
-    const hooks = createMessageHooks(store, container);
+    const hooks = createMessageHooks(store, container, undefined);
     const beforeCount = store.getEvents('msg-test').length;
     await hooks['message.updated']({
       message: { id: 'm2', role: 'user', content: 'hi' },
@@ -51,7 +51,7 @@ describe('createMessageHooks', () => {
   });
 
   it('deduplicates by message ID', async () => {
-    const hooks = createMessageHooks(store, container);
+    const hooks = createMessageHooks(store, container, undefined);
     const beforeCount = store.getEvents('msg-test').length;
     await hooks['message.updated']({
       message: { id: 'm3', role: 'assistant', content: 'first' },
@@ -65,7 +65,7 @@ describe('createMessageHooks', () => {
   });
 
   it('does nothing on message.updated when no session', async () => {
-    const hooks = createMessageHooks(store, container);
+    const hooks = createMessageHooks(store, container, undefined);
     container.sessionId = null;
     const beforeCount = store.getEvents('msg-test').length;
     await hooks['message.updated']({
@@ -76,7 +76,7 @@ describe('createMessageHooks', () => {
   });
 
   it('truncates long content to 300 chars', async () => {
-    const hooks = createMessageHooks(store, container);
+    const hooks = createMessageHooks(store, container, undefined);
     const long = 'x'.repeat(500);
     await hooks['message.updated']({
       message: { id: 'm-long', role: 'assistant', content: long },
@@ -89,7 +89,7 @@ describe('createMessageHooks', () => {
   });
 
   it('tracks content length in payload', async () => {
-    const hooks = createMessageHooks(store, container);
+    const hooks = createMessageHooks(store, container, undefined);
     await hooks['message.updated']({
       message: { id: 'm-len', role: 'assistant', content: 'exactly 23 chars!' },
     });

@@ -1,4 +1,4 @@
-import type { AgentEvent } from '../types.js';
+import type { AgentEvent, EventBroadcaster } from '../types.js';
 import type { PluginStore } from '../store/index.js';
 import type { PluginContainer } from '../plugin-container.js';
 import { generateId } from '../util/id.js';
@@ -27,7 +27,7 @@ function toolToAgent(tool: string, args?: Record<string, unknown>): string {
   return 'opencode';
 }
 
-export function createToolHooks(store: PluginStore, container: PluginContainer) {
+export function createToolHooks(store: PluginStore, container: PluginContainer, broadcast?: EventBroadcaster) {
 
   return {
     'tool.execute.before': async (input: unknown) => {
@@ -57,6 +57,7 @@ export function createToolHooks(store: PluginStore, container: PluginContainer) 
       };
 
       await store.addEvent(event);
+      broadcast?.(event);
 
       // Detect task delegations
       if (tool === 'task' || tool === 'todowrite') {
@@ -74,6 +75,7 @@ export function createToolHooks(store: PluginStore, container: PluginContainer) 
             timestamp: Date.now(),
           };
           await store.addEvent(dispatchEvent);
+          broadcast?.(dispatchEvent);
         }
       }
 
@@ -93,6 +95,7 @@ export function createToolHooks(store: PluginStore, container: PluginContainer) 
             timestamp: Date.now(),
           };
           await store.addEvent(skillEvent);
+          broadcast?.(skillEvent);
         }
       }
     },
@@ -126,6 +129,7 @@ export function createToolHooks(store: PluginStore, container: PluginContainer) 
           timestamp: Date.now(),
         };
         await store.addEvent(event);
+        broadcast?.(event);
       } else {
         const event: AgentEvent = {
           id: generateId(),
@@ -141,6 +145,7 @@ export function createToolHooks(store: PluginStore, container: PluginContainer) 
           timestamp: Date.now(),
         };
         await store.addEvent(event);
+        broadcast?.(event);
       }
     },
   };

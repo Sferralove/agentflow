@@ -29,7 +29,7 @@ describe('createToolHooks', () => {
   });
 
   it('logs task event on tool.execute.before', async () => {
-    const hooks = createToolHooks(store, container);
+    const hooks = createToolHooks(store, container, undefined);
     const beforeCount = store.getEvents('tool-test').length;
     await hooks['tool.execute.before']({ tool: 'bash', args: { command: 'ls' } });
     const newEvents = store.getEvents('tool-test').slice(beforeCount);
@@ -40,7 +40,7 @@ describe('createToolHooks', () => {
   });
 
   it('maps tools to correct agents', async () => {
-    const hooks = createToolHooks(store, container);
+    const hooks = createToolHooks(store, container, undefined);
     const testCases = [
       { tool: 'task', expected: 'delegator' },
       { tool: 'todowrite', expected: 'delegator' },
@@ -63,7 +63,7 @@ describe('createToolHooks', () => {
   });
 
   it('respects args.agent override', async () => {
-    const hooks = createToolHooks(store, container);
+    const hooks = createToolHooks(store, container, undefined);
     const beforeCount = store.getEvents('tool-test').length;
     await hooks['tool.execute.before']({ tool: 'bash', args: { agent: 'custom-agent' } });
     const events = store.getEvents('tool-test').slice(beforeCount);
@@ -72,7 +72,7 @@ describe('createToolHooks', () => {
   });
 
   it('creates dispatch event for subagent_type', async () => {
-    const hooks = createToolHooks(store, container);
+    const hooks = createToolHooks(store, container, undefined);
     const beforeCount = store.getEvents('tool-test').length;
     await hooks['tool.execute.before']({
       tool: 'task',
@@ -86,7 +86,7 @@ describe('createToolHooks', () => {
   });
 
   it('does nothing on tool.execute.before when no session', async () => {
-    const hooks = createToolHooks(store, container);
+    const hooks = createToolHooks(store, container, undefined);
     container.sessionId = null;
     const beforeCount = store.getEvents('tool-test').length;
     await hooks['tool.execute.before']({ tool: 'bash', args: {} });
@@ -95,7 +95,7 @@ describe('createToolHooks', () => {
   });
 
   it('logs error event on tool.execute.after when error present', async () => {
-    const hooks = createToolHooks(store, container);
+    const hooks = createToolHooks(store, container, undefined);
     // Need a before call to set up FIFO entry
     await hooks['tool.execute.before']({ tool: 'read', args: {} });
     const beforeCount = store.getEvents('tool-test').length;
@@ -111,7 +111,7 @@ describe('createToolHooks', () => {
   });
 
   it('logs complete event on tool.execute.after success', async () => {
-    const hooks = createToolHooks(store, container);
+    const hooks = createToolHooks(store, container, undefined);
     await hooks['tool.execute.before']({ tool: 'write', args: {} });
     const beforeCount = store.getEvents('tool-test').length;
     await hooks['tool.execute.after'](
@@ -126,7 +126,7 @@ describe('createToolHooks', () => {
   });
 
   it('truncates result to 200 chars', async () => {
-    const hooks = createToolHooks(store, container);
+    const hooks = createToolHooks(store, container, undefined);
     await hooks['tool.execute.before']({ tool: 'bash', args: {} });
     const beforeCount = store.getEvents('tool-test').length;
     await hooks['tool.execute.after'](
@@ -140,7 +140,7 @@ describe('createToolHooks', () => {
   });
 
   it('handles FIFO stack for concurrent same-tool calls', async () => {
-    const hooks = createToolHooks(store, container);
+    const hooks = createToolHooks(store, container, undefined);
     const beforeCount = store.getEvents('tool-test').length;
 
     // Simulate two concurrent bash calls
@@ -165,7 +165,7 @@ describe('createToolHooks', () => {
   });
 
   it('detects skill loading as message event', async () => {
-    const hooks = createToolHooks(store, container);
+    const hooks = createToolHooks(store, container, undefined);
     const beforeCount = store.getEvents('tool-test').length;
     await hooks['tool.execute.before']({
       tool: 'skill',
@@ -179,7 +179,7 @@ describe('createToolHooks', () => {
   });
 
   it('does not log agent-flow skill as message event', async () => {
-    const hooks = createToolHooks(store, container);
+    const hooks = createToolHooks(store, container, undefined);
     const beforeCount = store.getEvents('tool-test').length;
     await hooks['tool.execute.before']({
       tool: 'skill',
