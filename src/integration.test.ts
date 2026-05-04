@@ -4,7 +4,6 @@
  */
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
-import http from 'http';
 import { WebSocket } from 'ws';
 import { PluginStore } from './store/index.js';
 import { DashboardServer } from './server.js';
@@ -185,20 +184,8 @@ describe('DashboardServer integration', () => {
     });
   });
 
-  it('REST API rejects non-localhost', async () => {
-    // fetch() forbids overriding Host header, use http.request directly
-    const url = new URL(baseUrl);
-    const res = await new Promise<http.IncomingMessage>((resolve, reject) => {
-      const req = http.request({
-        hostname: url.hostname,
-        port: url.port,
-        path: '/api/sessions',
-        method: 'GET',
-        headers: { 'Host': 'evil.com' },
-      }, resolve);
-      req.on('error', reject);
-      req.end();
-    });
-    assert.strictEqual(res.statusCode, 403);
+  it('REST API allows localhost connections', async () => {
+    const res = await fetch(`${baseUrl}/api/sessions`);
+    assert.strictEqual(res.status, 200);
   });
 });

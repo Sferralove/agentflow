@@ -31,10 +31,11 @@ export class PluginStore {
     // Append event
     data.events.push(event);
 
-    // Atomic write: tmp file then rename
+    // Atomic write with restrictive permissions: tmp file then rename
     const tmpPath = filePath + '.tmp';
-    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2));
+    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), { mode: 0o600 });
     fs.renameSync(tmpPath, filePath);
+    fs.chmodSync(filePath, 0o600);
   }
 
   /** Read all events for a session */

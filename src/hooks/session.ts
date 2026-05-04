@@ -59,7 +59,7 @@ export function createSessionHook(store: PluginStore, container: PluginContainer
         agent: 'opencode',
         payload: {
           description: input.error?.message || 'Session error',
-          error: input.error,
+          error: input.error ? { message: input.error.message } : undefined,
         },
         timestamp: Date.now(),
       };

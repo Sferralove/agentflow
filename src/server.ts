@@ -19,10 +19,10 @@ function isLocalhostOrigin(origin: string): boolean {
   }
 }
 
-/** Express middleware that rejects non-localhost requests */
+/** Express middleware that rejects non-localhost requests using unspoofable remoteAddress */
 function localhostOnly(req: Request, res: Response, next: NextFunction): void {
-  const host = req.hostname || '';
-  if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') {
+  const remote = req.socket.remoteAddress || '';
+  if (remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1') {
     return next();
   }
   res.status(403).json({ error: 'access denied — localhost only' });

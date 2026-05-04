@@ -3,6 +3,7 @@ import type { PluginStore } from '../store/index.js';
 import type { PluginContainer } from '../plugin-container.js';
 import { generateId } from '../util/id.js';
 import { isToolInput, isToolOutput, asString, asOptionalString } from '../util/guards.js';
+import { redactSecrets } from '../util/redact.js';
 
 function toolToAgent(tool: string, args?: Record<string, unknown>): string {
   if (args?.agent && typeof args.agent === 'string') return args.agent;
@@ -51,7 +52,7 @@ export function createToolHooks(store: PluginStore, container: PluginContainer, 
         payload: {
           action: tool,
           description: `Executing: ${tool}`,
-          args: args || {},
+          args: redactSecrets(args || {}) as Record<string, unknown>,
         },
         timestamp: Date.now(),
       };
@@ -123,7 +124,8 @@ export function createToolHooks(store: PluginStore, container: PluginContainer, 
           agent,
           payload: {
             action: tool,
-            description: output.error,
+            description: typeof output.error === 'string' ? output.error : 'Tool error',
+            error: typeof output.error === 'string' ? undefined : { message: String(output.error) },
             duration,
           },
           timestamp: Date.now(),
