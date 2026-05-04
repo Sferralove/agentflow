@@ -10,14 +10,18 @@ npm run build    # tsc + vite (plugin + dashboard)
 ```
 
 **Build output:**
-- `dist/` — compiled plugin JS (entry: `dist/index.js`)
-- `dist/dashboard/` — static React dashboard (served by plugin server at runtime)
+- `dist/` — compiled plugin JS (entry: `dist/index.js` + `dist/start-dashboard.js`)
+- `dist/dashboard/` — static React dashboard (served by dashboard server at runtime)
 
-## npm install (published)
+## Usage
+
+### 1. Install in your project
 
 ```bash
 npm install @sferralove/agent-flow-plugin
 ```
+
+### 2. Configure plugin
 
 **opencode.json** (nella root del progetto target):
 ```json
@@ -29,6 +33,20 @@ npm install @sferralove/agent-flow-plugin
 
 OpenCode scarica automaticamente il pacchetto + dipendenze in `~/.cache/opencode/packages/`. \
 **Devi lanciare `opencode` dalla directory del progetto** per far sì che legga `opencode.json`.
+
+### 3. Start dashboard
+
+```bash
+npx @sferralove/agent-flow-plugin
+```
+
+Apri `http://localhost:3001` per vedere:
+
+- **Flow Graph** — reactflow canvas showing agents as nodes, dispatch delegations as edges
+- **Timeline** — real-time scrollable event list, color-coded by type (via file watcher)
+- **Session selector** — switch between monitored sessions via dropdown or `?session=` URL param
+
+Puoi cambiare porta con `PORT=3002 npx @sferralove/agent-flow-plugin`.
 
 ## Quick install (local plugin, dev)
 
@@ -44,31 +62,12 @@ cd .opencode/plugins/agent-flow && npm install --production
 
 **Nota:** `npm run build` DEVE essere eseguito prima — il plugin necessita di compilazione TypeScript + build dashboard Vite. `dist/` contiene tutto il necessario per il runtime (JS compilato, non TS).
 
-## Dashboard
+## Architecture
 
-The plugin starts an HTTP + WebSocket server on port 3001 (configurable). Open `http://localhost:3001` to see:
+- **Plugin** (`dist/index.js`) — hooks into OpenCode events, writes events to `.agent-flow/data/`
+- **Dashboard** (`dist/start-dashboard.js`) — standalone server, reads data files, serves React UI + WebSocket
 
-- **Flow Graph** — reactflow canvas showing agents as nodes, dispatch delegations as edges
-- **Timeline** — real-time scrollable event list, color-coded by type
-- **Session selector** — switch between monitored sessions via dropdown or `?session=` URL param
-
-### Configuration
-
-`.agent-flow/config.json`:
-```json
-{
-  "version": "0.2.0",
-  "dataDir": ".agent-flow/data",
-  "dashboard": {
-    "port": 3001,
-    "host": "localhost"
-  }
-}
-```
-
-### Security
-
-Dashboard server only accepts connections from `localhost` / `127.0.0.1` / `[::1]`. External browser tabs cannot access agent activity data.
+The plugin logs events autonomously. The dashboard is started separately and watches for new data files.
 
 ## Plugin API shape
 
@@ -90,7 +89,7 @@ export const server({ directory }): {
 
 `start` | `complete` | `dispatch` | `task` | `error` | `message`
 
-Each event written atomically (tmp file + rename) to `.agent-flow/data/{sessionId}.json` as an `events[]` array. Events are also broadcast in real-time via WebSocket to the dashboard.
+Each event written atomically (tmp file + rename) to `.agent-flow/data/{sessionId}.json` as an `events[]` array.
 
 ## Tool-to-agent mapping (flow graph)
 
