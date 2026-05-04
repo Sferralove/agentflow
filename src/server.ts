@@ -70,16 +70,16 @@ export class DashboardServer {
       });
     });
 
-    this.server.listen(this.config.port, this.config.host, () => {
-      console.log(`[agent-flow] Dashboard: http://${this.config.host}:${this.config.port}`);
-    });
-
     this.server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
         console.error(`[agent-flow] Port ${this.config.port} in use. Dashboard unavailable.`);
       } else {
         console.error('[agent-flow] Server error:', err.message);
       }
+    });
+
+    this.server.listen(this.config.port, this.config.host, () => {
+      console.log(`[agent-flow] Dashboard: http://${this.config.host}:${this.config.port}`);
     });
   }
 
