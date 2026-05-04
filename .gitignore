@@ -3,7 +3,3 @@ node_modules/
 .DS_Store
 *.tgz
 .opencode/
-server/tests/test-data/
-server/frontend/node_modules/
-server/frontend/dist/
-plugin/node_modules/
