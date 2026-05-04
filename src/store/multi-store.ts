@@ -63,4 +63,12 @@ export class MultiStore implements EventStore {
       .filter(f => f.endsWith('.json') && !f.endsWith('.tmp'))
       .map(f => f.replace('.json', ''));
   }
+
+  /** Force reload a session from disk (called by file watcher) */
+  reloadSession(sessionId: string): void {
+    const store = this.stores.get(sessionId);
+    if (store) {
+      store.reload();
+    }
+  }
 }

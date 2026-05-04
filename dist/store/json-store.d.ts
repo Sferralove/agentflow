@@ -8,6 +8,8 @@ export declare class JsonStore implements EventStore {
     private load;
     /** Reload from disk if file was modified since last load */
     private reloadIfChanged;
+    /** Force reload from disk (called by file watcher) */
+    reload(): void;
     private save;
     addEvent(event: AgentEvent): Promise<void>;
     private updateAgentFromEvent;

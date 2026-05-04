@@ -43,6 +43,11 @@ export class JsonStore implements EventStore {
     }
   }
 
+  /** Force reload from disk (called by file watcher) */
+  reload(): void {
+    this.load();
+  }
+
   private async save(): Promise<void> {
     const dir = path.dirname(this.filePath);
     if (!fs.existsSync(dir)) {

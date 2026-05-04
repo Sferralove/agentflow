@@ -46,6 +46,10 @@ class JsonStore {
             // stat failed, skip reload
         }
     }
+    /** Force reload from disk (called by file watcher) */
+    reload() {
+        this.load();
+    }
     async save() {
         const dir = path_1.default.dirname(this.filePath);
         if (!fs_1.default.existsSync(dir)) {

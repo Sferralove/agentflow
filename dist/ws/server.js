@@ -73,13 +73,13 @@ class AgentFlowWSServer {
             // Invalid message, ignore
         }
     }
-    broadcast(event) {
+    broadcast(data) {
         if (!this.wss)
             return;
-        const message = {
-            type: 'event',
-            data: event,
-        };
+        const wsTypes = ['event', 'heartbeat', 'ack', 'reload'];
+        const message = wsTypes.includes(data.type)
+            ? data
+            : { type: 'event', data: data };
         const payload = JSON.stringify(message);
         this.wss.clients.forEach((client) => {
             if (client.readyState === ws_1.WebSocket.OPEN) {

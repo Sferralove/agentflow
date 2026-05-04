@@ -87,13 +87,13 @@ export class AgentFlowWSServer {
     }
   }
 
-  broadcast(event: AgentEvent): void {
+  broadcast(data: AgentEvent | WSMessage): void {
     if (!this.wss) return;
 
-    const message: WSMessage = {
-      type: 'event',
-      data: event,
-    };
+    const wsTypes: string[] = ['event', 'heartbeat', 'ack', 'reload'];
+    const message: WSMessage = wsTypes.includes((data as WSMessage).type)
+      ? data as WSMessage
+      : { type: 'event', data: data as AgentEvent };
 
     const payload = JSON.stringify(message);
 

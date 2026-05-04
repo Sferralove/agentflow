@@ -17,7 +17,19 @@ function App() {
   const wsUrl = window.location.port === '5173'
     ? 'ws://localhost:3001'
     : `ws://${window.location.host}`;
-  const { events: wsEvents, connected } = useWebSocket(wsUrl);
+  const { events: wsEvents, connected, needsRefresh, acknowledgeRefresh } = useWebSocket(wsUrl);
+
+  // Re-fetch all events when server signals external file change
+  useEffect(() => {
+    if (!needsRefresh) return;
+    fetch('/api/events')
+      .then((res) => res.json())
+      .then((data) => {
+        setEvents(data);
+        acknowledgeRefresh();
+      })
+      .catch(() => acknowledgeRefresh());
+  }, [needsRefresh, acknowledgeRefresh]);
 
   // Merge WS events with initial fetch
   useEffect(() => {

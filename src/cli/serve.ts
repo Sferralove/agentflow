@@ -50,6 +50,7 @@ export function serveCommand(program: Command): void {
       process.on('SIGTERM', shutdown);
 
       await server.startWS(httpServer);
+      server.startFileWatcher(); // detect external file changes
 
       httpServer.listen(port, () => {
         console.log(`Dashboard + API: http://localhost:${port}`);

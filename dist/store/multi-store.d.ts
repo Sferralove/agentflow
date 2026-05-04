@@ -10,5 +10,7 @@ export declare class MultiStore implements EventStore {
     getAgentInfo(agentId: string): Promise<AgentInfo | null>;
     getAgentTree(sessionId: string): Promise<AgentNode[]>;
     getAllSessions(): Promise<string[]>;
+    /** Force reload a session from disk (called by file watcher) */
+    reloadSession(sessionId: string): void;
 }
 //# sourceMappingURL=multi-store.d.ts.map

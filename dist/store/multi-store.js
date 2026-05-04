@@ -61,6 +61,13 @@ class MultiStore {
             .filter(f => f.endsWith('.json') && !f.endsWith('.tmp'))
             .map(f => f.replace('.json', ''));
     }
+    /** Force reload a session from disk (called by file watcher) */
+    reloadSession(sessionId) {
+        const store = this.stores.get(sessionId);
+        if (store) {
+            store.reload();
+        }
+    }
 }
 exports.MultiStore = MultiStore;
 //# sourceMappingURL=multi-store.js.map

@@ -49,7 +49,7 @@ export interface EventFilter {
     to?: number;
 }
 export interface WSMessage {
-    type: 'event' | 'heartbeat' | 'ack';
+    type: 'event' | 'heartbeat' | 'ack' | 'reload';
     data?: AgentEvent | string;
     lastEventId?: string;
 }

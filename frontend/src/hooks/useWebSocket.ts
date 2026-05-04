@@ -4,6 +4,8 @@ import type { AgentEvent } from '../types';
 interface UseWebSocketReturn {
   events: AgentEvent[];
   connected: boolean;
+  needsRefresh: boolean;
+  acknowledgeRefresh: () => void;
   reconnect: () => void;
 }
 
@@ -14,6 +16,7 @@ const MAX_EVENTS = 200;
 export function useWebSocket(url: string): UseWebSocketReturn {
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [connected, setConnected] = useState(false);
+  const [needsRefresh, setNeedsRefresh] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -33,6 +36,10 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'heartbeat') return;
+        if (data.type === 'reload') {
+          setNeedsRefresh(true);
+          return;
+        }
         if (data.type === 'event' && data.data) {
           setEvents((prev) => {
             const next = [...prev, data.data as AgentEvent];
@@ -64,5 +71,5 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     };
   }, [connect]);
 
-  return { events, connected, reconnect: connect };
+  return { events, connected, needsRefresh, acknowledgeRefresh: () => setNeedsRefresh(false), reconnect: connect };
 }

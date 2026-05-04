@@ -1,5 +1,5 @@
 import type { Server } from 'http';
-import type { AgentEvent } from '../types';
+import type { AgentEvent, WSMessage } from '../types';
 export declare class AgentFlowWSServer {
     private wss;
     private port;
@@ -12,7 +12,7 @@ export declare class AgentFlowWSServer {
     stop(): Promise<void>;
     private handleConnection;
     private handleMessage;
-    broadcast(event: AgentEvent): void;
+    broadcast(data: AgentEvent | WSMessage): void;
     private startHeartbeat;
 }
 //# sourceMappingURL=server.d.ts.map
