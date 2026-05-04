@@ -2,13 +2,11 @@
  * Agent Flow Plugin — automatic OpenCode monitoring
  *
  * Hooks into OpenCode events to capture ALL agent activity without
- * requiring explicit cooperation from agents. Writes to .agent-flow/data/
- * for the existing dashboard to visualize.
+ * requiring explicit cooperation from agents. Writes to .agent-flow/data/.
  *
  * Usage:
  *   1. Add "agent-flow-plugin" to opencode.json plugin array
- *   2. Run "npx agent-flow serve" for the dashboard
- *   3. Everything auto-logged — agents don't need to know
+ *   2. Everything auto-logged — agents don't need to know
  */
 
 import type { Logger } from './types.js';

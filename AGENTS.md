@@ -82,6 +82,6 @@ Result payloads are truncated: `result` string at 200 chars, message content at 
 - **Peer dependency:** `@opencode-ai/plugin` — provided by OpenCode runtime, not installed here
 - **Storage:** local JSON files only — no external database, no server
 - **Atomic writes:** `writeFileSync` to `.tmp` then `renameSync` — safe against partial writes
-- **`.agent-flow/config.json`** contains `wsPort: 3001` — used by external dashboard
+- **`.agent-flow/config.json`** contains plugin configuration
 - **Message dedup:** assistant messages logged once per ID via `Set`
 - **Skill loading:** tool `skill` with `name !== 'agent-flow'` logged as `message` type event, not `task`
