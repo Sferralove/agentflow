@@ -12,7 +12,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { Logger, DashboardConfig } from './types.js';
+import type { DashboardConfig } from './types.js';
 import { PluginStore } from './store/index.js';
 import { PluginContainer } from './plugin-container.js';
 import { createSessionHook } from './hooks/session.js';
@@ -20,6 +20,10 @@ import { createToolHooks } from './hooks/tool.js';
 import { createMessageHooks } from './hooks/message.js';
 import { createTools } from './tools/index.js';
 import { DashboardServer } from './server.js';
+
+interface PluginInput {
+  directory: string;
+}
 
 const DEFAULT_CONFIG: DashboardConfig = {
   port: 3001,
@@ -37,27 +41,20 @@ function loadConfig(directory: string): DashboardConfig {
   return DEFAULT_CONFIG;
 }
 
-export const AgentFlowPlugin = async ({
-  directory,
-  logger,
-}: {
-  directory: string;
-  logger?: Logger;
-}) => {
+export const server = async ({ directory }: PluginInput) => {
   const store = new PluginStore(directory);
   const container = new PluginContainer();
-  const log = logger ?? console;
   const config = loadConfig(directory);
 
   // Dashboard server
-  const server = new DashboardServer(store, config);
-  const broadcast = (event: import('./types.js').AgentEvent) => server.broadcast(event);
+  const dashboardServer = new DashboardServer(store, config);
+  const broadcast = (event: import('./types.js').AgentEvent) => dashboardServer.broadcast(event);
 
   // Dashboard static files path (relative to plugin install dir, not cwd)
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
   const dashboardPath = path.join(__dirname, 'dashboard');
-  server.serveStatic(dashboardPath);
+  dashboardServer.serveStatic(dashboardPath);
 
   const sessionHooks = createSessionHook(store, container, broadcast);
   const toolHooks = createToolHooks(store, container, broadcast);
@@ -66,13 +63,13 @@ export const AgentFlowPlugin = async ({
 
   // Start server (non-blocking, failures handled internally)
   try {
-    server.start();
+    dashboardServer.start();
   } catch (err) {
-    log.error('[agent-flow] Failed to start dashboard server:', err);
+    console.error('[agent-flow] Failed to start dashboard server:', err);
   }
 
-  log.info('[agent-flow] Plugin loaded — monitoring all activity');
-  log.info(`[agent-flow] Data directory: ${directory}/.agent-flow/data/`);
+  console.log('[agent-flow] Plugin loaded — monitoring all activity');
+  console.log(`[agent-flow] Data directory: ${directory}/.agent-flow/data/`);
 
   return {
     ...sessionHooks,

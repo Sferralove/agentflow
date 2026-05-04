@@ -75,7 +75,7 @@ Dashboard server only accepts connections from `localhost` / `127.0.0.1` / `[::1
 Plugin factory exported from `src/index.ts`:
 
 ```
-AgentFlowPlugin({ directory, logger? }): {
+export const server({ directory }): {
   'session.created': hook,
   'session.idle': hook,
   'session.error': hook,
