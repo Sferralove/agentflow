@@ -12,7 +12,7 @@
     "agent-flow-mcp": "dist/mcp/stdio.js"
   },
   "scripts": {
-    "build": "tsc && (cd frontend && npm run build || true) && mkdir -p dist/public && cp -r frontend/dist/* dist/public/",
+    "build": "tsc && (cd frontend && npm run build || true) && mkdir -p dist/public && cp -r frontend/dist/* dist/public/ && mkdir -p dist/plugin && cp -r ../plugin/src/* dist/plugin/",
     "build:frontend": "cd frontend && npm run build",
     "dev": "tsc --watch & node dist/cli/index.js serve & cd frontend && npm run dev",
     "dev:backend": "tsc --watch",

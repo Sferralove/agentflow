@@ -1,30 +1,14 @@
 {
-  "name": "agent-flow",
-  "version": "0.1.0",
-  "description": "Agent/Subagent flow monitoring tool for OpenCode — plugin + server",
+  "name": "agent-flow-monorepo",
   "private": true,
   "workspaces": [
     "server",
     "plugin"
   ],
-  "main": "server/dist/server.js",
-  "files": [
-    "server/dist/",
-    "server/skills/",
-    "plugin/package.json",
-    "plugin/src/"
-  ],
-  "bin": {
-    "agent-flow": "server/dist/cli/index.js",
-    "agent-flow-mcp": "server/dist/mcp/stdio.js"
-  },
   "scripts": {
     "build": "npm run build -w server",
     "build:plugin": "npm run build -w plugin",
     "test": "npm run test -w server",
     "dev": "npm run dev -w server"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }
