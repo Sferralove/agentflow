@@ -3,8 +3,11 @@ export declare class JsonStore implements EventStore {
     private filePath;
     private events;
     private agents;
+    private lastMtime;
     constructor(filePath: string);
     private load;
+    /** Reload from disk if file was modified since last load */
+    private reloadIfChanged;
     private save;
     addEvent(event: AgentEvent): Promise<void>;
     private updateAgentFromEvent;

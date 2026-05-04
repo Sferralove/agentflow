@@ -6,6 +6,7 @@ export class JsonStore implements EventStore {
   private filePath: string;
   private events: AgentEvent[] = [];
   private agents: Map<string, AgentInfo> = new Map();
+  private lastMtime: number = 0;
 
   constructor(filePath: string) {
     this.filePath = filePath;
@@ -15,6 +16,8 @@ export class JsonStore implements EventStore {
   private load(): void {
     if (fs.existsSync(this.filePath)) {
       try {
+        const stat = fs.statSync(this.filePath);
+        this.lastMtime = stat.mtimeMs;
         const data = fs.readFileSync(this.filePath, 'utf-8');
         const parsed = JSON.parse(data);
         this.events = parsed.events || [];
@@ -22,7 +25,21 @@ export class JsonStore implements EventStore {
       } catch {
         this.events = [];
         this.agents = new Map();
+        this.lastMtime = 0;
       }
+    }
+  }
+
+  /** Reload from disk if file was modified since last load */
+  private reloadIfChanged(): void {
+    if (!fs.existsSync(this.filePath)) return;
+    try {
+      const stat = fs.statSync(this.filePath);
+      if (stat.mtimeMs > this.lastMtime) {
+        this.load();
+      }
+    } catch {
+      // stat failed, skip reload
     }
   }
 
@@ -38,6 +55,8 @@ export class JsonStore implements EventStore {
     const tmpPath = this.filePath + '.tmp';
     await fs.promises.writeFile(tmpPath, JSON.stringify(data, null, 2));
     await fs.promises.rename(tmpPath, this.filePath);
+    // Update mtime after our own write to avoid unnecessary reload
+    try { this.lastMtime = fs.statSync(this.filePath).mtimeMs; } catch { /* ignore */ }
   }
 
   async addEvent(event: AgentEvent): Promise<void> {
@@ -117,6 +136,7 @@ export class JsonStore implements EventStore {
   }
 
   async getEvents(filter?: EventFilter): Promise<AgentEvent[]> {
+    this.reloadIfChanged();
     let result = this.events;
 
     if (filter) {
@@ -141,6 +161,7 @@ export class JsonStore implements EventStore {
   }
 
   async getSession(sessionId: string): Promise<SessionData | null> {
+    this.reloadIfChanged();
     const events = this.events.filter(e => e.sessionId === sessionId);
     if (events.length === 0) return null;
 
@@ -168,6 +189,7 @@ export class JsonStore implements EventStore {
   }
 
   async getAgentInfo(agentId: string): Promise<AgentInfo | null> {
+    this.reloadIfChanged();
     return this.agents.get(agentId) || null;
   }
 
@@ -182,6 +204,7 @@ export class JsonStore implements EventStore {
   }
 
   async getAllSessions(): Promise<string[]> {
+    this.reloadIfChanged();
     const sessions = new Set<string>();
     for (const event of this.events) {
       sessions.add(event.sessionId);
