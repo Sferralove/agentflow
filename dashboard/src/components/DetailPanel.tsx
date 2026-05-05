@@ -10,19 +10,19 @@ interface DetailPanelProps {
 
 export default function DetailPanel({ selectedNode, events, unified }: DetailPanelProps) {
   if (!selectedNode) {
-    const hasEvents = events.length > 0
     return (
       <div className="h-full flex flex-col">
-        <div className="p-3 border-b border-gray-800 text-xs font-semibold uppercase text-gray-500">
-          {unified ? 'Timeline (all sessions)' : 'Timeline'} ({events.length})
+        <div className="px-3 py-2 border-b border-gray-800 text-[11px] font-semibold uppercase text-gray-500 shrink-0">
+          {unified ? `Timeline · all sessions` : 'Timeline'} · {events.length} events
         </div>
-        <div className="flex-1 overflow-y-auto p-3">
-          {!hasEvents && (
-            <div className="text-gray-500 text-sm text-center mt-8">
-              {unified ? 'No events yet — start OpenCode' : 'Click an agent node to inspect'}
+        <div className="flex-1 overflow-y-auto">
+          {events.length === 0 ? (
+            <div className="text-gray-600 text-xs text-center mt-12 px-4">
+              {unified ? 'Start OpenCode to see events' : 'Click an agent node to inspect'}
             </div>
+          ) : (
+            events.map(evt => <EventRow key={evt.id} event={evt} showSession={unified} />)
           )}
-          {events.map(evt => <EventRow key={evt.id} event={evt} showSession={unified} />)}
         </div>
       </div>
     )
@@ -34,29 +34,28 @@ export default function DetailPanel({ selectedNode, events, unified }: DetailPan
     : 'running...'
 
   return (
-    <div className="h-full overflow-y-auto p-3">
-      <div className="mb-4">
+    <div className="h-full flex flex-col">
+      <div className="px-3 py-2 border-b border-gray-800 shrink-0">
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: STATUS_COLORS[selectedNode.status] }} />
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: STATUS_COLORS[selectedNode.status] }} />
           <h3 className="font-semibold text-sm">{selectedNode.name}</h3>
         </div>
-        <div className="text-xs text-gray-400 mt-1">
-          <div>{selectedNode.status} · {duration}</div>
-          <div>{selectedNode.sessionId || '—'}</div>
+        <div className="text-[11px] text-gray-500 mt-0.5">
+          {selectedNode.status} · {duration}
+          {(selectedNode.tasksCompleted > 0 || selectedNode.tasksFailed > 0) && (
+            <span> · {selectedNode.tasksCompleted}/{selectedNode.tasksCompleted + selectedNode.tasksFailed} tasks</span>
+          )}
         </div>
       </div>
-
-      {(selectedNode.tasksCompleted > 0 || selectedNode.tasksFailed > 0) && (
-        <div className="mb-4 p-2 bg-gray-900 rounded text-xs">
-          <div>✓ Completed: {selectedNode.tasksCompleted}</div>
-          <div>✗ Failed: {selectedNode.tasksFailed}</div>
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-3 py-1.5 text-[11px] font-semibold uppercase text-gray-600 border-b border-gray-800/50">
+          Events · {events.length}
         </div>
-      )}
-
-      <div className="text-xs font-semibold uppercase text-gray-500 mb-2">Events ({events.length})</div>
-      <div>
-        {events.length === 0 && <div className="text-gray-500 text-xs">No events yet</div>}
-        {events.map(evt => <EventRow key={evt.id} event={evt} />)}
+        {events.length === 0 ? (
+          <div className="text-gray-600 text-xs text-center mt-8">No events for this agent</div>
+        ) : (
+          events.map(evt => <EventRow key={evt.id} event={evt} />)
+        )}
       </div>
     </div>
   )

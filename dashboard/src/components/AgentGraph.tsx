@@ -1,14 +1,50 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import ReactFlow, {
   Background, Controls, MiniMap,
   type Node, type Edge,
   useNodesState, useEdgesState,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
+import dagre from 'dagre'
 import type { AgentNode as AgentNodeType, AgentEdge as AgentEdgeType } from '../types'
 import AgentNodeComponent from './AgentNode'
 
 const nodeTypes = { agentNode: AgentNodeComponent }
+const NODE_W = 160
+const NODE_H = 70
+
+function layoutNodes(nodes: AgentNodeType[], edges: AgentEdgeType[]): { nodes: Node[]; edges: Edge[] } {
+  const g = new dagre.graphlib.Graph()
+  g.setDefaultEdgeLabel(() => ({}))
+  g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 80 })
+
+  nodes.forEach(n => g.setNode(n.id, { width: NODE_W, height: NODE_H }))
+  edges.forEach(e => g.setEdge(e.source, e.target))
+
+  dagre.layout(g)
+
+  const laidNodes: Node[] = nodes.map(n => {
+    const pos = g.node(n.id)
+    return {
+      id: n.id,
+      type: 'agentNode',
+      position: { x: pos.x - NODE_W / 2, y: pos.y - NODE_H / 2 },
+      data: n,
+    }
+  })
+
+  const laidEdges: Edge[] = edges.map(e => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    label: e.description.slice(0, 30),
+    type: 'smoothstep',
+    animated: true,
+    style: { stroke: '#6b7280', strokeWidth: 2 },
+  }))
+
+  return { nodes: laidNodes, edges: laidEdges }
+}
 
 interface AgentGraphProps {
   nodes: AgentNodeType[]
@@ -20,30 +56,12 @@ export default function AgentGraph({ nodes, edges, onNodeSelect }: AgentGraphPro
   const [flowNodes, setFlowNodes, onNodesChange] = useNodesState([])
   const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState([])
 
-  // Sync nodes when props change — preserve user-dragged positions
-  useEffect(() => {
-    setFlowNodes(prev => {
-      const prevPos = new Map(prev.map(n => [n.id, n.position]))
-      return nodes.map(n => ({
-        id: n.id,
-        type: 'agentNode',
-        position: prevPos.get(n.id) || { x: 0, y: 0 },
-        data: n,
-      }))
-    })
-  }, [nodes, setFlowNodes])
+  const layout = useMemo(() => layoutNodes(nodes, edges), [nodes, edges])
 
-  // Sync edges when props change
   useEffect(() => {
-    setFlowEdges(edges.map(e => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      label: e.description.slice(0, 30),
-      animated: true,
-      style: { stroke: '#6b7280' },
-    })))
-  }, [edges, setFlowEdges])
+    setFlowNodes(layout.nodes)
+    setFlowEdges(layout.edges)
+  }, [layout, setFlowNodes, setFlowEdges])
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     onNodeSelect(node.data as AgentNodeType)
@@ -62,6 +80,7 @@ export default function AgentGraph({ nodes, edges, onNodeSelect }: AgentGraphPro
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         fitView
+        fitViewOptions={{ padding: 0.3 }}
       >
         <Background color="#374151" gap={16} />
         <Controls />

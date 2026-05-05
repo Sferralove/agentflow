@@ -38,11 +38,17 @@ export default function App() {
       .catch(() => {})
   }, [])
 
+  // Filter visible events: only tool.start, tool.end, session.created
+  const visibleEvents = useMemo(() => {
+    const keep = new Set(['tool.start', 'tool.end', 'session.created'])
+    return events.filter(e => keep.has(e.type))
+  }, [events])
+
   // Filter events: by selected node, or show all in unified mode
   const displayEvents = useMemo(() => {
-    if (!selectedNode) return events
-    return events.filter(e => e.agent === selectedNode.id)
-  }, [events, selectedNode])
+    if (!selectedNode) return visibleEvents
+    return visibleEvents.filter(e => e.agent === selectedNode.id)
+  }, [visibleEvents, selectedNode])
 
   return (
     <div className="h-screen flex flex-col">
