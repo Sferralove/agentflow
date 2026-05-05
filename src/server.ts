@@ -56,7 +56,7 @@ export class DashboardServer {
       res.json({ events: this.store.getEvents(req.params.sessionId) });
     });
 
-    // API: accept events from agents (POST)
+    // API: accept events from agents (POST) — secondary channel
     this.app.post('/api/agent/event', async (req, res) => {
       try {
         const event = req.body;
@@ -64,7 +64,7 @@ export class DashboardServer {
           res.status(400).json({ error: 'Missing required fields: type, agent' });
           return;
         }
-        const agentEvent: import('./types.js').AgentEvent = {
+        const agentEvent: AgentEvent = {
           id: event.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           sessionId: event.sessionId || 'default',
           type: event.type,
@@ -102,7 +102,6 @@ export class DashboardServer {
     this.wss = new WebSocketServer({
       server: this.server,
       verifyClient: (info: { origin: string; req: http.IncomingMessage }) => {
-        // Allow if origin is localhost (browser) or if origin is empty and host is localhost (non-browser dev clients)
         if (isLocalhostOrigin(info.origin)) return true;
         if (!info.origin) {
           const host = info.req.headers.host || '';
@@ -156,5 +155,11 @@ export class DashboardServer {
         ws.send(data);
       }
     }
+  }
+
+  /** Stop the server gracefully */
+  stop(): void {
+    this.wss?.close();
+    this.server?.close();
   }
 }

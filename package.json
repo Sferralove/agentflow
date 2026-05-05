@@ -1,11 +1,13 @@
 {
   "name": "@sferralove/agent-flow-plugin",
-  "version": "1.3.1",
-  "description": "OpenCode plugin for automatic agent flow monitoring — no agent cooperation needed",
+  "version": "2.0.0",
+  "description": "OpenCode agent flow monitor — zero agent cooperation. SSE collector + real-time dashboard.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "bin": "./dist/start-dashboard.js",
+  "bin": {
+    "agent-flow-plugin": "./dist/start-dashboard.js"
+  },
   "exports": {
     ".": "./dist/index.js"
   },
@@ -34,9 +36,6 @@
   "publishConfig": {
     "access": "public"
   },
-  "peerDependencies": {
-    "@opencode-ai/plugin": "*"
-  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
@@ -51,7 +50,8 @@
     "opencode",
     "plugin",
     "monitoring",
-    "agent-flow"
+    "agent-flow",
+    "sse"
   ],
   "license": "MIT",
   "dependencies": {

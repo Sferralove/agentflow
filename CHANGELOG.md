@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.0.0] — 2026-05-05
+
+### Changed
+- **SSE collector as primary event source** — zero agent cooperation needed. Reads OpenCode event stream at `:4101/global/event`.
+- **Removed plugin hooks** — no more `@opencode-ai/plugin` dependency, zero crash risk inside OpenCode runtime.
+- **Single store writer** — all events go through `PluginStore`, no more path mismatch (`sessions/` vs `data/`).
+- **Automatic reconnection** — collector retries with exponential backoff on connection loss.
+- **Unified event model** — single `AgentEvent` type, removed duplicate `AgentFlowEvent`.
+
+### Removed
+- `src/hooks/` — old tool hook system (crashed OpenCode)
+- `src/tools/` — `agentflow_events/sessions/stats` (depended on dead plugin)
+- `src/plugin-container.ts` — unused state container
+- `@opencode-ai/plugin` peer dependency
+
+### Fixed
+- Path divergence: collector wrote to `data/sessions/`, store read from `data/`
+- File watcher missing recursive events from subdirectories
+- Potential race condition with dual writers on same JSON file
+
 ## [1.0.0] — 2026-05-04
 
 ### Added

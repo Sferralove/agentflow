@@ -1,29 +1,6 @@
 /**
- * Runtime type guards for OpenCode hook inputs.
- * Replaces bare `as` casts with validated narrowing.
+ * Runtime type guards for tool hook inputs/outputs.
  */
-
-export interface SessionCreatedInput {
-  session?: { id?: string; title?: string };
-}
-
-export function isSessionCreatedInput(x: unknown): x is SessionCreatedInput {
-  if (typeof x !== 'object' || x === null) return false;
-  const obj = x as Record<string, unknown>;
-  if (obj.session !== undefined) {
-    if (typeof obj.session !== 'object' || obj.session === null) return false;
-  }
-  return true;
-}
-
-export interface SessionErrorInput {
-  error?: { message?: string };
-}
-
-export function isSessionErrorInput(x: unknown): x is SessionErrorInput {
-  if (typeof x !== 'object' || x === null) return false;
-  return true;
-}
 
 export interface ToolInput {
   tool: string;
@@ -45,27 +22,6 @@ export interface ToolOutput {
 
 export function isToolOutput(x: unknown): x is ToolOutput {
   if (typeof x !== 'object' || x === null) return false;
-  return true;
-}
-
-export interface MessageInput {
-  message?: {
-    id: string;
-    role: string;
-    content?: string;
-  };
-}
-
-export function isMessageInput(x: unknown): x is MessageInput {
-  if (typeof x !== 'object' || x === null) return false;
-  const obj = x as Record<string, unknown>;
-  if (obj.message !== undefined) {
-    if (typeof obj.message !== 'object' || obj.message === null) return false;
-    const msg = obj.message as Record<string, unknown>;
-    if (msg.id !== undefined && typeof msg.id !== 'string') return false;
-    if (msg.role !== undefined && typeof msg.role !== 'string') return false;
-    if (msg.content !== undefined && typeof msg.content !== 'string') return false;
-  }
   return true;
 }
 
