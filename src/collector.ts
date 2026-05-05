@@ -2,21 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import type { AgentEvent, EventType } from './types.js';
 
-const DATA_DIR = '.agent-flow/data';
-
-interface OpenCodeEvent {
-  type: string;
-  sessionID?: string;
-  sessionId?: string;
-  session?: { id?: string; title?: string };
-  properties?: Record<string, unknown>;
-  tool?: string;
-  command?: string;
-  title?: string;
-  error?: { message?: string };
-  status?: string;
-}
-
 export interface AgentFlowEvent {
   id: string;
   ts: string;
@@ -32,10 +17,13 @@ function eventId(): string {
   return `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function detectSessionId(event: OpenCodeEvent): string | undefined {
-  return event.sessionID || event.sessionId || event.session?.id
-    || (event.properties?.sessionID as string)
-    || (event.properties?.sessionId as string);
+function detectSessionId(event: Record<string, unknown>): string | undefined {
+  const props = event.properties as Record<string, unknown> | undefined;
+  const session = event.session as Record<string, unknown> | undefined;
+  return (event.sessionID as string) || (event.sessionId as string)
+    || (session?.id as string)
+    || (props?.sessionID as string)
+    || (props?.sessionId as string);
 }
 
 function detectPhase(type: string): string {
@@ -48,16 +36,17 @@ function detectPhase(type: string): string {
   return 'system';
 }
 
-function toAgentFlowEvent(raw: OpenCodeEvent): AgentFlowEvent {
+function toAgentFlowEvent(raw: Record<string, unknown>): AgentFlowEvent {
+  const eventType = (raw.type as string) || 'unknown';
   return {
-    id: eventId(),
+    id: (raw.id as string) || eventId(),
     ts: new Date().toISOString(),
     sessionId: detectSessionId(raw) || 'unknown',
-    type: raw.type || 'unknown',
-    phase: detectPhase(raw.type || ''),
-    status: raw.status,
-    label: raw.tool || raw.command || raw.title || raw.type || 'event',
-    payload: raw as unknown as Record<string, unknown>,
+    type: eventType,
+    phase: detectPhase(eventType),
+    status: raw.status as string | undefined,
+    label: (raw.tool as string) || (raw.command as string) || (raw.title as string) || eventType,
+    payload: raw,
   };
 }
 
@@ -150,7 +139,7 @@ export function buildCollector(dataDir: string, broadcaster?: (event: AgentFlowE
 
           try {
             const raw = JSON.parse(dataLines.join('\n'));
-            const event = raw.event ?? raw;
+            const event = raw.event ?? raw.payload ?? raw;
             const afEvent = toAgentFlowEvent(event);
             persistEvent(dataDir, afEvent);
             broadcaster?.(afEvent);
