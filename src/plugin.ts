@@ -10,13 +10,9 @@ const TOOLS_TRACKED = new Set(['task', 'write', 'edit', 'bash'])
 const MAX_WRITERS = 50
 const FLUSH_DEBOUNCE_MS = 250
 
-// Keep a persistent writer per session to append JSONL lines efficiently
 const writers = new Map<string, FileSink>()
-// Debounce flush timers — one pending timer per session
 const flushTimers = new Map<string, ReturnType<typeof setTimeout>>()
-// Track tool call start times for duration computation (keyed by sessionId:tool)
 const startTimes = new Map<string, number>()
-// Guard against duplicate shutdown handler registration
 let cleanupRegistered = false
 
 function extractSessionId(raw: Record<string, unknown>): string {
@@ -35,8 +31,7 @@ function extractAgent(raw: Record<string, unknown>): string {
   const info = props?.info as Record<string, unknown> | undefined
   return (raw.agent as string)
     || (info?.agent as string)
-    || (raw.tool as string)
-    || 'unknown'
+    || 'builder'
 }
 
 function generateId(): string {
@@ -47,18 +42,12 @@ function makeStartTimeKey(sessionId: string, tool: string): string {
   return `${sessionId}:${tool}`
 }
 
-/** Flush a single session's writer. Silently drops errors. */
 async function flushWriter(sid: string): Promise<void> {
   const writer = writers.get(sid)
   if (!writer) return
-  try {
-    await writer.flush()
-  } catch {
-    // Silently drop flush errors
-  }
+  try { await writer.flush() } catch {}
 }
 
-/** Schedule a debounced flush for a session. Resets on each call. */
 function scheduleFlush(sid: string): void {
   const existing = flushTimers.get(sid)
   if (existing) clearTimeout(existing)
@@ -68,48 +57,24 @@ function scheduleFlush(sid: string): void {
   }, FLUSH_DEBOUNCE_MS))
 }
 
-/** Flush and close all writers. Used during shutdown. */
 async function flushAllWriters(): Promise<void> {
-  // Cancel any pending debounced flushes
-  for (const [sid, timer] of flushTimers) {
-    clearTimeout(timer)
-  }
+  for (const [sid, timer] of flushTimers) clearTimeout(timer)
   flushTimers.clear()
-
-  for (const [sid, writer] of writers) {
-    try {
-      await writer.flush()
-      writer.end()
-    } catch {
-      // Silently drop errors during shutdown
-    }
+  for (const [, writer] of writers) {
+    try { await writer.flush(); writer.end() } catch {}
   }
   writers.clear()
 }
 
-/** Evict the oldest writer when the map exceeds MAX_WRITERS. */
 function evictOldestWriter(): void {
   if (writers.size < MAX_WRITERS) return
   const oldestSid = writers.keys().next().value
   if (!oldestSid) return
-
   const writer = writers.get(oldestSid)
-  if (writer) {
-    try {
-      writer.flush() // fire-and-forget
-      writer.end()
-    } catch {
-      // Silently drop
-    }
-  }
+  if (writer) { try { writer.flush(); writer.end() } catch {} }
   writers.delete(oldestSid)
-
-  // Clean up any pending timer for the evicted session
   const timer = flushTimers.get(oldestSid)
-  if (timer) {
-    clearTimeout(timer)
-    flushTimers.delete(oldestSid)
-  }
+  if (timer) { clearTimeout(timer); flushTimers.delete(oldestSid) }
 }
 
 async function writeEvent(evt: Record<string, unknown>): Promise<void> {
@@ -118,51 +83,31 @@ async function writeEvent(evt: Record<string, unknown>): Promise<void> {
   try {
     let writer = writers.get(sid)
     if (!writer) {
-      // Evict oldest before creating new writer to bound FD usage
       evictOldestWriter()
       writer = Bun.file(`${LOG_DIR}/${sid}.jsonl`).writer()
       writers.set(sid, writer)
     }
-    // Await write to prevent interleaved JSONL lines on rapid concurrent writes
     await writer.write(JSON.stringify(evt) + '\n')
-    // Debounced flush — batches nearby writes for perf, ensures data lands on disk
     scheduleFlush(sid)
-  } catch {
-    // Silently drop write errors (e.g. directory missing, permissions)
-  }
+  } catch {}
 }
 
-/** Register process-wide shutdown handlers to flush + close all writers. */
 function registerShutdownHandlers(): void {
   if (cleanupRegistered) return
   cleanupRegistered = true
-
-  const shutdown = async () => {
-    await flushAllWriters()
-  }
-
-  process.on('beforeExit', shutdown)
-
-  // Signal handlers: best-effort cleanup because FileSink.end() flushes buffers
-  process.on('SIGINT', () => {
-    // Fire-and-forget flush, then exit
-    flushAllWriters().finally(() => process.exit(0))
-  })
-  process.on('SIGTERM', () => {
-    flushAllWriters().finally(() => process.exit(0))
-  })
+  process.on('beforeExit', flushAllWriters)
+  process.on('SIGINT', () => { flushAllWriters().finally(() => process.exit(0)) })
+  process.on('SIGTERM', () => { flushAllWriters().finally(() => process.exit(0)) })
 }
 registerShutdownHandlers()
 
-export const AgentFlowPlugin: Plugin = async ({ directory }) => ({
+export const server: Plugin = async ({ directory }) => ({
   "tool.execute.before": async (input: any, output: any) => {
     const tool = input.tool as string
     if (!TOOLS_TRACKED.has(tool)) return
 
     const raw = input as Record<string, unknown>
     const sid = extractSessionId(raw)
-
-    // Track start time so after hook can compute real duration
     startTimes.set(makeStartTimeKey(sid, tool), Date.now())
 
     await writeEvent({
@@ -173,16 +118,8 @@ export const AgentFlowPlugin: Plugin = async ({ directory }) => ({
       agent: extractAgent(raw),
       tool,
       input: tool === 'task'
-        ? {
-            subagent_type: output.args?.subagent_type,
-            description: output.args?.description,
-          }
-        : {
-            ...output.args,
-            // Truncate long command/description to avoid huge JSONL lines
-            command: output.args?.command?.slice(0, 500),
-            description: output.args?.description?.slice(0, 200),
-          },
+        ? { subagent_type: output.args?.subagent_type, description: output.args?.description }
+        : { ...output.args, command: output.args?.command?.slice(0, 500), description: output.args?.description?.slice(0, 200) },
     })
   },
 
@@ -192,9 +129,6 @@ export const AgentFlowPlugin: Plugin = async ({ directory }) => ({
 
     const raw = input as Record<string, unknown>
     const sid = extractSessionId(raw)
-
-    // Compute duration from locally tracked start time instead of output.duration
-    // (output.duration is not guaranteed by the typed plugin contract)
     const key = makeStartTimeKey(sid, tool)
     const started = startTimes.get(key)
     startTimes.delete(key)
@@ -209,7 +143,6 @@ export const AgentFlowPlugin: Plugin = async ({ directory }) => ({
       tool,
       duration,
       output: typeof output.result === 'string' ? output.result.slice(0, 1000) : output.result,
-      // Fallback chain: output.error (standard) or output.metadata?.error (alternative path)
       error: output.error || output.metadata?.error || null,
     })
   },
@@ -225,9 +158,10 @@ export const AgentFlowPlugin: Plugin = async ({ directory }) => ({
       timestamp: Date.now(),
       agent: extractAgent(event),
     }
-
     if (type === 'session.error') payload.error = event.error
-
     await writeEvent(payload)
   },
 })
+
+/** @deprecated use `server` instead — kept for backward compat with tests */
+export const AgentFlowPlugin = server
