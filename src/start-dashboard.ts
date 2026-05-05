@@ -29,28 +29,30 @@ dashboardServer.serveStatic(dashboardPath);
 // Start HTTP + WebSocket server
 dashboardServer.start();
 
-// --- SSE Collector (primary event source, zero agent cooperation needed) ---
+// --- SSE Collector (always tries, auto-detects auth) ---
 
-const opencodePassword = process.env.OPENCODE_SERVER_PASSWORD;
-const opencodeUsername = process.env.OPENCODE_SERVER_USERNAME || 'opencode';
 const opencodeUrl = process.env.OPENCODE_SERVER_URL || 'http://127.0.0.1:4101/global/event';
+const opencodePassword = process.env.OPENCODE_SERVER_PASSWORD;
+const opencodeUsername = process.env.OPENCODE_SERVER_USERNAME;
+
+const collector = buildCollector(store, (event: AgentEvent) => {
+  dashboardServer.broadcast(event);
+});
+
+collector.connect(opencodeUrl, opencodeUsername, opencodePassword);
 
 if (opencodePassword) {
-  const collector = buildCollector(store, (event: AgentEvent) => {
-    dashboardServer.broadcast(event);
-  });
-
-  collector.connect(opencodeUrl, opencodeUsername, opencodePassword);
-  console.log(`[agent-flow] SSE collector: ${opencodeUrl}`);
-
-  // Graceful shutdown
-  const shutdown = () => {
-    collector.disconnect();
-    process.exit(0);
-  };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  console.log(`[agent-flow] SSE collector: ${opencodeUrl} (auth: basic)`);
 } else {
-  console.log('[agent-flow] SSE collector disabled (set OPENCODE_SERVER_PASSWORD to enable)');
-  console.log('[agent-flow] Events will only come from POST /api/agent/event');
+  console.log(`[agent-flow] SSE collector: ${opencodeUrl} (trying without auth)`);
+  console.log('[agent-flow] If OpenCode requires auth, set OPENCODE_SERVER_PASSWORD.');
+  console.log('[agent-flow] Events also accepted via POST /api/agent/event');
 }
+
+// Graceful shutdown
+const shutdown = () => {
+  collector.disconnect();
+  process.exit(0);
+};
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

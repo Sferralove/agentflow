@@ -66,12 +66,28 @@ function parseSSEChunk(chunk: string): Record<string, unknown>[] {
 }
 
 export interface Collector {
-  connect(url: string, username: string, password: string): Promise<void>;
+  connect(url: string, username?: string, password?: string): void;
   disconnect(): void;
+}
+
+/** Human-readable error message for common connection failures */
+function connectErrorMsg(err: unknown): string {
+  if (err instanceof Error) {
+    if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+      return 'Authentication required. Set OPENCODE_SERVER_PASSWORD.';
+    }
+    const cause = (err as Error & { cause?: { code?: string } }).cause;
+    const code = cause?.code || '';
+    if (code === 'ECONNREFUSED' || err.message.includes('ECONNREFUSED')) {
+      return 'OpenCode server not running. Start OpenCode first.';
+    }
+  }
+  return 'Connection failed. Retrying...';
 }
 
 /**
  * Build SSE collector that feeds events into the store and optionally broadcasts them.
+ * Auto-detects auth: tries without credentials first, then with if provided.
  * Includes automatic reconnection with exponential backoff.
  */
 export function buildCollector(
@@ -83,20 +99,32 @@ export function buildCollector(
 
   async function connectWithRetry(
     url: string,
-    username: string,
-    password: string,
+    username: string | undefined,
+    password: string | undefined,
   ): Promise<void> {
-    let backoff = 1000; // 1s initial
-    const maxBackoff = 30000; // 30s cap
+    let backoff = 1000;
+    const maxBackoff = 30000;
+    let authFailed = false;
 
     while (running) {
       try {
         await streamEvents(url, username, password);
-        // Stream ended normally — reconnect after short delay
         backoff = 1000;
+        authFailed = false;
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') return;
-        console.error(`[agent-flow] SSE connection error, retrying in ${backoff}ms:`, err);
+
+        const msg = connectErrorMsg(err);
+        console.error(`[agent-flow] ${msg}`);
+
+        // Don't spam retries on auth failures
+        if (msg.includes('Authentication required')) {
+          if (!authFailed) {
+            authFailed = true;
+            console.error('[agent-flow] Set OPENCODE_SERVER_PASSWORD and restart.');
+          }
+          backoff = 30000; // Check every 30s if password was set
+        }
       }
 
       if (!running) return;
@@ -107,24 +135,35 @@ export function buildCollector(
 
   async function streamEvents(
     url: string,
-    username: string,
-    password: string,
+    username: string | undefined,
+    password: string | undefined,
   ): Promise<void> {
     if (abortController) abortController.abort();
     abortController = new AbortController();
 
-    const auth = Buffer.from(`${username}:${password}`).toString('base64');
+    const headers: Record<string, string> = {
+      Accept: 'text/event-stream',
+    };
+
+    if (password) {
+      const user = username || 'opencode';
+      const auth = Buffer.from(`${user}:${password}`).toString('base64');
+      headers.Authorization = `Basic ${auth}`;
+    }
 
     const res = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${auth}`,
-        Accept: 'text/event-stream',
-      },
+      headers,
       signal: abortController.signal,
     });
 
-    if (!res.ok || !res.body) {
+    if (res.status === 401) {
+      throw new Error('Unauthorized (401)');
+    }
+    if (!res.ok) {
       throw new Error(`SSE connection failed: HTTP ${res.status}`);
+    }
+    if (!res.body) {
+      throw new Error('SSE response has no body');
     }
 
     console.log(`[agent-flow] Connected to OpenCode SSE: ${url}`);
@@ -162,9 +201,8 @@ export function buildCollector(
     }
   }
 
-  async function connect(url: string, username: string, password: string): Promise<void> {
+  function connect(url: string, username?: string, password?: string): void {
     running = true;
-    // Don't await — let it run in background
     connectWithRetry(url, username, password).catch((err) => {
       console.error('[agent-flow] Collector fatal error:', err);
     });

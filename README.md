@@ -35,14 +35,19 @@ and streams them in real-time via WebSocket to a React dashboard.
 ## Quick start
 
 ```bash
-# Basic (no automatic events — dashboard only)
 npx @sferralove/agent-flow-plugin
-
-# Full (with SSE collector — reads ALL OpenCode events)
-OPENCODE_SERVER_PASSWORD=your-password npx @sferralove/agent-flow-plugin
 ```
 
 Open **`http://localhost:3001`**.
+
+The SSE collector auto-detects auth. If OpenCode doesn't require a password, it works immediately.
+
+If you see `Authentication required`, start OpenCode with a password:
+
+```bash
+opencode --server-password mypassword
+OPENCODE_SERVER_PASSWORD=mypassword npx @sferralove/agent-flow-plugin
+```
 
 ---
 
@@ -57,7 +62,7 @@ OpenCode Server :4101 ──SSE──→ collector.ts ──→ PluginStore ─�
                                     └──── Dashboard ◄────┘
 ```
 
-1. **SSE Collector** connects to OpenCode's `/global/event` endpoint and reads every event.
+1. **SSE Collector** auto-connects to OpenCode's `/global/event` endpoint, auto-detects auth, reads every event.
 2. **PluginStore** writes events atomically to `.agent-flow/data/{sessionId}.json`.
 3. **Dashboard Server** serves the React UI, exposes REST API, and broadcasts via WebSocket.
 
@@ -70,7 +75,7 @@ No plugin loaded inside OpenCode. No agent hooks. No `@opencode-ai/plugin`.
 | Var | Default | Description |
 |-----|---------|-------------|
 | `PORT` | `3001` | Dashboard server port |
-| `OPENCODE_SERVER_PASSWORD` | — | Password for OpenCode SSE auth (required for automatic events) |
+| `OPENCODE_SERVER_PASSWORD` | — | Password for OpenCode SSE auth (only if required) |
 | `OPENCODE_SERVER_USERNAME` | `opencode` | Username for OpenCode SSE auth |
 | `OPENCODE_SERVER_URL` | `http://127.0.0.1:4101/global/event` | SSE endpoint URL |
 
