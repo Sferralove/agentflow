@@ -31,7 +31,7 @@ dashboardServer.start();
 
 // --- SSE Collector (always tries, auto-detects auth) ---
 
-const opencodeUrl = process.env.OPENCODE_SERVER_URL || 'http://127.0.0.1:4101/global/event';
+const opencodeUrl = process.env.OPENCODE_SERVER_URL || 'http://127.0.0.1:4096/global/event';
 const opencodePassword = process.env.OPENCODE_SERVER_PASSWORD;
 const opencodeUsername = process.env.OPENCODE_SERVER_USERNAME;
 

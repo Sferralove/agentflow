@@ -23,7 +23,7 @@ npx @sferralove/agent-flow-plugin
 
 Apri `http://localhost:3001`.
 
-Il collector tenta automaticamente la connessione SSE a `http://127.0.0.1:4101/global/event`:
+Il collector tenta automaticamente la connessione SSE a `http://127.0.0.1:4096/global/event`:
 - **Senza auth** — se OpenCode non richiede password, funziona subito.
 - **Con auth** — se OpenCode richiede autenticazione, appare: `Authentication required. Set OPENCODE_SERVER_PASSWORD.`
 
@@ -31,10 +31,10 @@ Il dashboard funziona in ogni caso — gli eventi arrivano anche via `POST /api/
 
 ### 2. Se OpenCode richiede autenticazione
 
-Avvia OpenCode con una password server:
+Imposta la password come variabile d'ambiente quando avvii OpenCode:
 
 ```bash
-opencode --server-password mypassword
+OPENCODE_SERVER_PASSWORD=mypassword opencode
 ```
 
 Poi avvia il dashboard con la stessa password:
@@ -50,12 +50,12 @@ OPENCODE_SERVER_PASSWORD=mypassword npx @sferralove/agent-flow-plugin
 | `PORT` | `3001` | Dashboard server port |
 | `OPENCODE_SERVER_PASSWORD` | — | Password for OpenCode SSE auth (only if required) |
 | `OPENCODE_SERVER_USERNAME` | `opencode` | Username for OpenCode SSE auth |
-| `OPENCODE_SERVER_URL` | `http://127.0.0.1:4101/global/event` | SSE endpoint URL |
+| `OPENCODE_SERVER_URL` | `http://127.0.0.1:4096/global/event` | SSE endpoint URL |
 
 ## Architecture
 
 ```
-OpenCode Server :4101 ──SSE──→ collector.ts ──→ PluginStore ──→ .agent-flow/data/*.json
+OpenCode Server :4096 ──SSE──→ collector.ts ──→ PluginStore ──→ .agent-flow/data/*.json
        (zero agent coop)            │                    │
                                     ▼                    ▼
                               WebSocket            REST API :3001
