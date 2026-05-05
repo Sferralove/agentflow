@@ -26,8 +26,8 @@ function buildGraph(events: AgentEvent[]): { nodes: Node[]; edges: Edge[] } {
     if (event.timestamp > stats.lastTs) stats.lastTs = event.timestamp;
     agentCounts.set(event.agent, stats);
 
-    // Build dispatch edges
-    if (event.type === 'dispatch' && event.targetAgent) {
+    // Build dispatch edges (accept both dispatch and delegation types)
+    if ((event.type === 'dispatch' || event.type === 'delegation') && event.targetAgent) {
       const key = `${event.agent}->${event.targetAgent}`;
       const existing = dispatchEdges.get(key);
       if (existing) {

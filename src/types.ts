@@ -1,4 +1,4 @@
-export type EventType = 'start' | 'complete' | 'dispatch' | 'task' | 'error' | 'message';
+export type EventType = 'start' | 'complete' | 'dispatch' | 'delegation' | 'task' | 'error' | 'message';
 
 export interface AgentEvent {
   id: string;

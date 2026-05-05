@@ -56,7 +56,15 @@ function filterAndMap(raw: Record<string, unknown>): AgentEvent | null {
   }
 
   const sessionId = extractSessionId(raw);
-  const agent = (raw.tool as string) || (raw.command as string) || (raw.title as string) || 'opencode';
+
+  // Extract agent from event payload: tool/command (tool events) or properties.info.agent (session/message events)
+  const props = raw.properties as Record<string, unknown> | undefined;
+  const info = props?.info as Record<string, unknown> | undefined;
+  const agent = (raw.tool as string)
+    || (raw.command as string)
+    || (raw.title as string)
+    || (info?.agent as string)
+    || 'opencode';
 
   return {
     id: (raw.id as string) || `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,

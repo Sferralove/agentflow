@@ -1,6 +1,6 @@
 // NOTE: AgentEvent and EventType mirror the backend types in src/types.ts.
 // Keep in sync when the plugin event schema changes.
-export type EventType = 'start' | 'complete' | 'dispatch' | 'task' | 'error' | 'message';
+export type EventType = 'start' | 'complete' | 'dispatch' | 'delegation' | 'task' | 'error' | 'message';
 
 export interface AgentEvent {
   id: string;
