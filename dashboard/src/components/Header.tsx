@@ -1,11 +1,17 @@
+interface SessionInfo {
+  id: string
+  type: 'parent' | 'child'
+}
+
 interface HeaderProps {
   sessionId: string
-  sessions: string[]
+  sessions: SessionInfo[]
+  isParent: boolean
   onSessionChange: (id: string) => void
   connected: boolean
 }
 
-export default function Header({ sessionId, sessions, onSessionChange, connected }: HeaderProps) {
+export default function Header({ sessionId, sessions, isParent, onSessionChange, connected }: HeaderProps) {
   const shortId = (id: string) => id.length > 24 ? id.slice(-12) : id
 
   return (
@@ -19,12 +25,17 @@ export default function Header({ sessionId, sessions, onSessionChange, connected
             onChange={e => onSessionChange(e.target.value)}
           >
             {sessions.map(s => (
-              <option key={s} value={s}>{shortId(s)}</option>
+              <option key={s.id} value={s.id}>
+                {s.type === 'parent' ? '📁' : ' └ '}{shortId(s.id)}
+              </option>
             ))}
           </select>
         )}
         {sessions.length === 0 && (
           <span className="text-xs text-gray-500">no sessions — start OpenCode</span>
+        )}
+        {isParent && sessions.length > 1 && (
+          <span className="text-xs text-blue-400">unified timeline ({sessions.length} sessions)</span>
         )}
       </div>
       <div className="flex items-center gap-2 text-xs">

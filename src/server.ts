@@ -233,22 +233,44 @@ async function handleRequest(req: Request): Promise<Response> {
     })
   }
 
-  // GET events for session with optional since filter
+  // GET events for session with optional since + tree mode
   if (url.pathname === '/api/events') {
     const raw = url.searchParams.get('session')
     if (!raw) return new Response('Missing session param', { status: 400, headers: corsHeaders })
     const sessionId = sanitizeSessionId(raw)
     if (!sessionId) return new Response('Invalid session param', { status: 400, headers: corsHeaders })
     const since = parseInt(url.searchParams.get('since') || '0', 10)
+    const tree = url.searchParams.get('tree') === 'true'
 
     try {
-      const file = Bun.file(`${SESSIONS_DIR}/${sessionId}.jsonl`)
-      const text = await file.text()
-      const events = text.trim().split('\n')
-        .filter(l => l.trim())
-        .map(l => JSON.parse(l))
-        .filter((e: AgentEvent) => e.timestamp >= since)
-      return new Response(JSON.stringify(events), {
+      let allEvents: AgentEvent[] = []
+
+      if (tree) {
+        // Merge events from ALL sessions for unified timeline
+        const files = readdirSync(SESSIONS_DIR).filter(f => f.endsWith('.jsonl'))
+        for (const name of files) {
+          try {
+            const text = await Bun.file(`${SESSIONS_DIR}/${name}`).text()
+            const events = text.trim().split('\n')
+              .filter(l => l.trim())
+              .map(l => JSON.parse(l))
+              .filter((e: AgentEvent) => e.timestamp >= since)
+            allEvents.push(...events)
+          } catch {}
+        }
+      } else {
+        const file = Bun.file(`${SESSIONS_DIR}/${sessionId}.jsonl`)
+        const text = await file.text()
+        allEvents = text.trim().split('\n')
+          .filter(l => l.trim())
+          .map(l => JSON.parse(l))
+          .filter((e: AgentEvent) => e.timestamp >= since)
+      }
+
+      // Sort merged events by timestamp
+      allEvents.sort((a, b) => a.timestamp - b.timestamp)
+
+      return new Response(JSON.stringify(allEvents), {
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       })
     } catch {
@@ -273,7 +295,15 @@ async function handleRequest(req: Request): Promise<Response> {
       const files = readdirSync(SESSIONS_DIR)
         .filter(f => f.endsWith('.jsonl'))
         .map(f => f.replace('.jsonl', ''))
-      return new Response(JSON.stringify({ sessions: files }), {
+        .sort()
+
+      // First session is the parent, rest are children
+      const sessions = files.map((id, i) => ({
+        id,
+        type: i === 0 ? 'parent' : 'child' as const,
+      }))
+
+      return new Response(JSON.stringify({ sessions }), {
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       })
     } catch {

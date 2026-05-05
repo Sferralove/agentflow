@@ -11,42 +11,55 @@ function getSessionParam(): string | null {
   return new URLSearchParams(window.location.search).get('session')
 }
 
+interface SessionInfo {
+  id: string
+  type: 'parent' | 'child'
+}
+
 export default function App() {
   const [sessionId, setSessionId] = useState<string | null>(getSessionParam)
-  const [sessions, setSessions] = useState<string[]>([])
+  const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [selectedNode, setSelectedNode] = useState<AgentNode | null>(null)
   const { events, graph, connected } = useSSE(sessionId)
+
+  const isParent = sessions.length > 0 && sessions[0]?.id === sessionId
 
   // Fetch available sessions
   useEffect(() => {
     fetch('/api/sessions')
       .then(r => r.json())
       .then(d => {
-        setSessions(d.sessions || [])
-        // Auto-select first session if no session param
-        if (!getSessionParam() && d.sessions.length > 0 && !sessionId) {
-          setSessionId(d.sessions[0])
+        const list: SessionInfo[] = d.sessions || []
+        setSessions(list)
+        if (!getSessionParam() && list.length > 0 && !sessionId) {
+          setSessionId(list[0].id)
         }
       })
       .catch(() => {})
   }, [])
 
-  const nodeEvents = useMemo(
-    () => events.filter(e => !selectedNode || e.agent === selectedNode.id),
-    [events, selectedNode],
-  )
+  // Filter events: by selected node, or show all in unified mode
+  const displayEvents = useMemo(() => {
+    if (!selectedNode) return events
+    return events.filter(e => e.agent === selectedNode.id)
+  }, [events, selectedNode])
 
   return (
     <div className="h-screen flex flex-col">
       <Header
         sessionId={sessionId || '—'}
         sessions={sessions}
+        isParent={isParent}
         onSessionChange={setSessionId}
         connected={connected}
       />
       <div className="flex-1 flex">
         <div className="w-1/3 border-r border-gray-800 bg-gray-900 overflow-hidden">
-          <DetailPanel selectedNode={selectedNode} events={nodeEvents} />
+          <DetailPanel
+            selectedNode={selectedNode}
+            events={displayEvents}
+            unified={isParent && !selectedNode}
+          />
         </div>
         <div className="w-2/3">
           <ReactFlowProvider>

@@ -5,13 +5,25 @@ import EventRow from './EventRow'
 interface DetailPanelProps {
   selectedNode: AgentNode | null
   events: AgentEvent[]
+  unified?: boolean
 }
 
-export default function DetailPanel({ selectedNode, events }: DetailPanelProps) {
+export default function DetailPanel({ selectedNode, events, unified }: DetailPanelProps) {
   if (!selectedNode) {
+    const hasEvents = events.length > 0
     return (
-      <div className="h-full flex items-center justify-center text-gray-500 text-sm p-4">
-        Click an agent node to inspect
+      <div className="h-full flex flex-col">
+        <div className="p-3 border-b border-gray-800 text-xs font-semibold uppercase text-gray-500">
+          {unified ? 'Timeline (all sessions)' : 'Timeline'} ({events.length})
+        </div>
+        <div className="flex-1 overflow-y-auto p-3">
+          {!hasEvents && (
+            <div className="text-gray-500 text-sm text-center mt-8">
+              {unified ? 'No events yet — start OpenCode' : 'Click an agent node to inspect'}
+            </div>
+          )}
+          {events.map(evt => <EventRow key={evt.id} event={evt} showSession={unified} />)}
+        </div>
       </div>
     )
   }
