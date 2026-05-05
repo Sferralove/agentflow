@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AgentEvent, SessionGraph } from '../types'
 
-const API_BASE = 'http://localhost:3001'
+const API_BASE = ''
 
 export function useSSE(sessionId: string | null) {
   const [events, setEvents] = useState<AgentEvent[]>([])
@@ -31,22 +31,20 @@ export function useSSE(sessionId: string | null) {
       .then(g => setGraph(g))
       .catch(() => {})
 
-    return () => {
-      es.close()
-      setConnected(false)
-    }
-  }, [sessionId])
-
-  useEffect(() => {
-    if (!sessionId || events.length === 0) return
-    const timer = setTimeout(() => {
+    // Poll graph every 2s to pick up changes
+    const poll = setInterval(() => {
       fetch(`${API_BASE}/api/agents/${sessionId}`)
         .then(r => r.json())
         .then(g => setGraph(g))
         .catch(() => {})
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [events.length, sessionId])
+    }, 2000)
+
+    return () => {
+      es.close()
+      clearInterval(poll)
+      setConnected(false)
+    }
+  }, [sessionId])
 
   return { events, graph, connected }
 }

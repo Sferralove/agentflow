@@ -5,12 +5,7 @@ import { STATUS_COLORS } from '../types'
 
 const AgentNodeComponent = ({ data, selected }: NodeProps<AgentNodeType>) => {
   const color = STATUS_COLORS[data.status]
-
-  const icon = data.type === 'main' ? '🏗️' :
-    data.id === 'product-manager' ? '📋' :
-    data.id === 'backend-dev' ? '⚙️' :
-    data.id === 'tester' ? '🧪' :
-    data.id === 'reviewer' ? '🔍' : '🤖'
+  const icon = data.type === 'main' ? '🏗️' : '🤖'
 
   return (
     <div

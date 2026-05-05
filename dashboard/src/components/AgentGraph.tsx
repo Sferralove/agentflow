@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import ReactFlow, {
   Background, Controls, MiniMap,
   type Node, type Edge,
@@ -17,24 +17,33 @@ interface AgentGraphProps {
 }
 
 export default function AgentGraph({ nodes, edges, onNodeSelect }: AgentGraphProps) {
-  const rn: Node[] = nodes.map(n => ({
-    id: n.id,
-    type: 'agentNode',
-    position: { x: 0, y: 0 },
-    data: n,
-  }))
+  const [flowNodes, setFlowNodes, onNodesChange] = useNodesState([])
+  const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState([])
 
-  const re: Edge[] = edges.map(e => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    label: e.description.slice(0, 30),
-    animated: true,
-    style: { stroke: '#6b7280' },
-  }))
+  // Sync nodes when props change — preserve user-dragged positions
+  useEffect(() => {
+    setFlowNodes(prev => {
+      const prevPos = new Map(prev.map(n => [n.id, n.position]))
+      return nodes.map(n => ({
+        id: n.id,
+        type: 'agentNode',
+        position: prevPos.get(n.id) || { x: 0, y: 0 },
+        data: n,
+      }))
+    })
+  }, [nodes, setFlowNodes])
 
-  const [flowNodes, , onNodesChange] = useNodesState(rn)
-  const [flowEdges, , onEdgesChange] = useEdgesState(re)
+  // Sync edges when props change
+  useEffect(() => {
+    setFlowEdges(edges.map(e => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      label: e.description.slice(0, 30),
+      animated: true,
+      style: { stroke: '#6b7280' },
+    })))
+  }, [edges, setFlowEdges])
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     onNodeSelect(node.data as AgentNodeType)

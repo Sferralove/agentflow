@@ -16,9 +16,9 @@ export default function DetailPanel({ selectedNode, events }: DetailPanelProps) 
     )
   }
 
-  const nodeEvents = events.filter(e => e.agent === selectedNode.id)
   const duration = selectedNode.completedAt
     ? ((selectedNode.completedAt - selectedNode.startedAt) / 1000).toFixed(0) + 's'
+    : selectedNode.status === 'error' ? 'error'
     : 'running...'
 
   return (
@@ -30,7 +30,7 @@ export default function DetailPanel({ selectedNode, events }: DetailPanelProps) 
         </div>
         <div className="text-xs text-gray-400 mt-1">
           <div>{selectedNode.status} · {duration}</div>
-          <div>{selectedNode.sessionId}</div>
+          <div>{selectedNode.sessionId || '—'}</div>
         </div>
       </div>
 
@@ -41,10 +41,10 @@ export default function DetailPanel({ selectedNode, events }: DetailPanelProps) 
         </div>
       )}
 
-      <div className="text-xs font-semibold uppercase text-gray-500 mb-2">Events ({nodeEvents.length})</div>
+      <div className="text-xs font-semibold uppercase text-gray-500 mb-2">Events ({events.length})</div>
       <div>
-        {nodeEvents.length === 0 && <div className="text-gray-500 text-xs">No events yet</div>}
-        {nodeEvents.map(evt => <EventRow key={evt.id} event={evt} />)}
+        {events.length === 0 && <div className="text-gray-500 text-xs">No events yet</div>}
+        {events.map(evt => <EventRow key={evt.id} event={evt} />)}
       </div>
     </div>
   )

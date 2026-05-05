@@ -13,16 +13,26 @@ const TYPE_COLORS: Record<string, string> = {
   'session.compacted': 'text-purple-400',
 }
 
+function eventDesc(evt: AgentEvent): string {
+  if (!evt.tool) return evt.type
+  const parts: string[] = [evt.tool]
+  if (evt.input?.description) {
+    parts.push((evt.input.description as string).slice(0, 40))
+  } else if (evt.input?.command) {
+    parts.push((evt.input.command as string).slice(0, 40))
+  } else if (evt.input?.filePath) {
+    parts.push(evt.input.filePath as string)
+  }
+  return parts.join(' ')
+}
+
 export default function EventRow({ event }: { event: AgentEvent }) {
   const time = new Date(event.timestamp).toLocaleTimeString()
   const icon = TOOL_ICONS[event.tool || ''] || ''
   const color = TYPE_COLORS[event.type] || 'text-gray-400'
-  const desc = event.tool
-    ? `${event.tool}${event.input?.filePath ? ' ' + event.input.filePath : ''}${event.input?.command ? ' ' + (event.input.command as string).slice(0, 40) : ''}`
-    : event.type
+  const desc = eventDesc(event)
 
-  const outputText = typeof event.output === 'string' ? event.output : null
-  const outputShort = outputText && outputText.length < 50 ? outputText : null
+  const outputText = typeof event.output === 'string' && event.output.length < 50 ? event.output : null
 
   return (
     <div className="flex items-center gap-2 py-1.5 border-b border-gray-800 text-xs">
@@ -35,8 +45,8 @@ export default function EventRow({ event }: { event: AgentEvent }) {
       {event.error && (
         <span className="text-red-400 ml-1 shrink-0" title={event.error as string}>⚠️</span>
       )}
-      {outputShort && (
-        <span className="text-green-400 ml-1 shrink-0">{outputShort}</span>
+      {outputText && (
+        <span className="text-green-400 ml-1 shrink-0">{outputText}</span>
       )}
     </div>
   )
