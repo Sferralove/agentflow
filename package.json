@@ -1,6 +1,6 @@
 {
   "name": "@sferralove/agent-flow-plugin",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "OpenCode plugin for automatic agent flow monitoring — no agent cooperation needed",
   "type": "module",
   "main": "dist/index.js",
