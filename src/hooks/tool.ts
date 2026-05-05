@@ -28,17 +28,29 @@ function toolToAgent(tool: string, args?: Record<string, unknown>): string {
   return 'opencode';
 }
 
+interface ToolInput {
+  tool: string;
+  sessionID?: string;
+  args?: Record<string, unknown>;
+}
+
+interface ToolOutput {
+  result?: string;
+  error?: string;
+}
+
 export function createToolHooks(store: PluginStore, container: PluginContainer, broadcast?: EventBroadcaster) {
 
   return {
     'tool.execute.before': async (input: unknown) => {
       if (!isToolInput(input)) return;
-      if (!container.sessionId) return;
+      const ti = input as ToolInput;
+      const sessionId = ti.sessionID;
+      if (!sessionId) return;
 
-      const { tool, args } = input;
+      const { tool, args } = ti;
       const agent = toolToAgent(tool, args);
 
-      // Push onto FIFO stack for this tool type (handles concurrent executions)
       if (!container.inFlight.has(tool)) {
         container.inFlight.set(tool, []);
       }
@@ -46,7 +58,7 @@ export function createToolHooks(store: PluginStore, container: PluginContainer, 
 
       const event: AgentEvent = {
         id: generateId(),
-        sessionId: container.sessionId,
+        sessionId,
         type: 'task',
         agent,
         payload: {
@@ -60,13 +72,12 @@ export function createToolHooks(store: PluginStore, container: PluginContainer, 
       await store.addEvent(event);
       broadcast?.(event);
 
-      // Detect task delegations
       if (tool === 'task' || tool === 'todowrite') {
         const subagent = asOptionalString(args?.subagent_type);
         if (subagent) {
           const dispatchEvent: AgentEvent = {
             id: generateId(),
-            sessionId: container.sessionId,
+            sessionId,
             type: 'dispatch',
             agent: 'opencode',
             targetAgent: subagent,
@@ -80,13 +91,12 @@ export function createToolHooks(store: PluginStore, container: PluginContainer, 
         }
       }
 
-      // Detect skill loading
       if (tool === 'skill') {
         const skillName = asOptionalString(args?.name);
         if (skillName && skillName !== 'agent-flow') {
           const skillEvent: AgentEvent = {
             id: generateId(),
-            sessionId: container.sessionId,
+            sessionId,
             type: 'message',
             agent: 'opencode',
             payload: {
@@ -104,11 +114,12 @@ export function createToolHooks(store: PluginStore, container: PluginContainer, 
     'tool.execute.after': async (input: unknown, output: unknown) => {
       if (!isToolInput(input)) return;
       if (!isToolOutput(output)) return;
-      if (!container.sessionId) return;
+      const ti = input as ToolInput;
+      const sessionId = ti.sessionID;
+      if (!sessionId) return;
 
-      const { tool, args } = input;
+      const { tool, args } = ti;
 
-      // Pop from FIFO stack (shift = oldest first)
       const stack = container.inFlight.get(tool);
       const flight = stack?.shift();
       if (stack?.length === 0) container.inFlight.delete(tool);
@@ -116,16 +127,18 @@ export function createToolHooks(store: PluginStore, container: PluginContainer, 
       const agent = flight?.agent || toolToAgent(tool, args);
       const duration = flight ? Date.now() - flight.startedAt : 0;
 
-      if (output.error) {
+      const to = output as ToolOutput;
+
+      if (to.error) {
         const event: AgentEvent = {
           id: generateId(),
-          sessionId: container.sessionId,
+          sessionId,
           type: 'error',
           agent,
           payload: {
             action: tool,
-            description: typeof output.error === 'string' ? output.error : 'Tool error',
-            error: typeof output.error === 'string' ? undefined : { message: String(output.error) },
+            description: typeof to.error === 'string' ? to.error : 'Tool error',
+            error: typeof to.error === 'string' ? undefined : { message: String(to.error) },
             duration,
           },
           timestamp: Date.now(),
@@ -135,14 +148,14 @@ export function createToolHooks(store: PluginStore, container: PluginContainer, 
       } else {
         const event: AgentEvent = {
           id: generateId(),
-          sessionId: container.sessionId,
+          sessionId,
           type: 'complete',
           agent,
           payload: {
             action: tool,
             description: `Completed: ${tool}`,
             duration,
-            result: typeof output?.result === 'string' ? output.result.slice(0, 200) : undefined,
+            result: typeof to?.result === 'string' ? to.result.slice(0, 200) : undefined,
           },
           timestamp: Date.now(),
         };
