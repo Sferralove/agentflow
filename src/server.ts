@@ -51,9 +51,10 @@ export class DashboardServer {
       res.json({ sessions: this.store.getSessions() });
     });
 
-    // API: get events for a session
+    // API: get events for a session (last 500 by default)
     this.app.get('/api/events/:sessionId', (req, res) => {
-      res.json({ events: this.store.getEvents(req.params.sessionId) });
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 500;
+      res.json({ events: this.store.getEvents(req.params.sessionId, limit) });
     });
 
     // API: accept events from agents (POST) — secondary channel
@@ -167,5 +168,6 @@ export class DashboardServer {
   stop(): void {
     this.wss?.close();
     this.server?.close();
+    this.store.close();
   }
 }
