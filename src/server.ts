@@ -184,7 +184,7 @@ async function handleRequest(req: Request): Promise<Response> {
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   }
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders })
 
   // Health check
   if (url.pathname === '/health') {
