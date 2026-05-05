@@ -251,7 +251,7 @@ async function handleRequest(req: Request): Promise<Response> {
         svg: 'image/svg+xml', json: 'application/json',
       }
       return new Response(file, {
-        headers: { 'Content-Type': mimeMap[ext || ''] || 'text/plain' },
+        headers: { 'Content-Type': mimeMap[ext || ''] || 'text/plain', ...corsHeaders },
       })
     }
   } catch { /* fall through */ }
