@@ -21,6 +21,9 @@ export default function EventRow({ event }: { event: AgentEvent }) {
     ? `${event.tool}${event.input?.filePath ? ' ' + event.input.filePath : ''}${event.input?.command ? ' ' + (event.input.command as string).slice(0, 40) : ''}`
     : event.type
 
+  const outputText = typeof event.output === 'string' ? event.output : null
+  const outputShort = outputText && outputText.length < 50 ? outputText : null
+
   return (
     <div className="flex items-center gap-2 py-1.5 border-b border-gray-800 text-xs">
       <span className="text-gray-500 w-16 shrink-0">{time}</span>
@@ -32,8 +35,8 @@ export default function EventRow({ event }: { event: AgentEvent }) {
       {event.error && (
         <span className="text-red-400 ml-1 shrink-0" title={event.error as string}>⚠️</span>
       )}
-      {event.output && typeof event.output === 'string' && event.output.length < 50 && (
-        <span className="text-green-400 ml-1 shrink-0">{event.output}</span>
+      {outputShort && (
+        <span className="text-green-400 ml-1 shrink-0">{outputShort}</span>
       )}
     </div>
   )
