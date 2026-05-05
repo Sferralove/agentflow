@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
 import type { AgentEvent } from './types';
 import StatsBar from './components/StatsBar';
@@ -11,38 +11,74 @@ function getSessionFromUrl(): string | null {
   return params.get('session') || null;
 }
 
+/** Fetch existing events for a session via REST API */
+async function fetchEvents(sessionId: string): Promise<AgentEvent[]> {
+  try {
+    const res = await fetch(`/api/events/${sessionId}`);
+    if (!res.ok) return [];
+    const body = await res.json();
+    return body.events || [];
+  } catch {
+    return [];
+  }
+}
+
 export default function App() {
-  const { events, sessions, connected, subscribe } = useWebSocket();
+  const { events: wsEvents, sessions, connected, subscribe } = useWebSocket();
   const [selectedSession, setSelectedSession] = useState<string | null>(getSessionFromUrl);
+  const [restEvents, setRestEvents] = useState<AgentEvent[]>([]);
+
+  // Merge WebSocket events with REST-fetched events, deduplicated by id
+  const allEvents = useMemo(() => {
+    const seen = new Set<string>();
+    const merged: AgentEvent[] = [];
+    // REST events first (older), then WS events (newer)
+    for (const e of restEvents) {
+      if (!seen.has(e.id)) {
+        seen.add(e.id);
+        merged.push(e);
+      }
+    }
+    for (const e of wsEvents) {
+      if (!seen.has(e.id)) {
+        seen.add(e.id);
+        merged.push(e);
+      }
+    }
+    return merged.sort((a, b) => a.timestamp - b.timestamp);
+  }, [wsEvents, restEvents]);
 
   // Filter events by selected session
   const filteredEvents = useMemo(() => {
-    if (!selectedSession) return events;
-    return events.filter(e => e.sessionId === selectedSession);
-  }, [events, selectedSession]);
+    if (!selectedSession) return allEvents;
+    return allEvents.filter(e => e.sessionId === selectedSession);
+  }, [allEvents, selectedSession]);
 
   // Create a keyed set of sessionIds from incoming events for the dropdown
   const availableSessions = useMemo(() => {
     const set = new Set(sessions);
-    events.forEach(e => set.add(e.sessionId));
+    allEvents.forEach(e => set.add(e.sessionId));
     return Array.from(set).sort().reverse();
-  }, [sessions, events]);
+  }, [sessions, allEvents]);
+
+  const handleSessionChange = useCallback((sessionId: string) => {
+    setSelectedSession(sessionId);
+    subscribe(sessionId);
+    setRestEvents([]);
+    // Fetch existing events from store
+    fetchEvents(sessionId).then(events => {
+      setRestEvents(events);
+    });
+    window.history.replaceState(null, '', `?session=${sessionId}`);
+  }, [subscribe]);
 
   // Auto-select latest session if none selected
   useEffect(() => {
     if (!selectedSession && availableSessions.length > 0) {
       const latest = availableSessions[0];
-      setSelectedSession(latest);
-      subscribe(latest);
-      window.history.replaceState(null, '', `?session=${latest}`);
+      handleSessionChange(latest);
     }
-  }, [selectedSession, availableSessions, subscribe]);
-
-  const handleSessionChange = (sessionId: string) => {
-    setSelectedSession(sessionId);
-    subscribe(sessionId);
-    window.history.replaceState(null, '', `?session=${sessionId}`);
-  };
+  }, [selectedSession, availableSessions, handleSessionChange]);
 
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100 overflow-hidden font-mono">

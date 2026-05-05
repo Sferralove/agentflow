@@ -1,6 +1,6 @@
 {
   "name": "@sferralove/agent-flow-plugin",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "OpenCode agent flow monitor — zero agent cooperation. SSE collector + real-time dashboard.",
   "type": "module",
   "main": "dist/index.js",
