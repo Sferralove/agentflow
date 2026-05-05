@@ -18,7 +18,7 @@ export default function Timeline({ events }: { events: AgentEvent[] }) {
   const sorted = [...events].reverse(); // newest at top
 
   return (
-    <div className="w-[320px] shrink-0 border-r border-gray-800 flex flex-col overflow-hidden">
+    <div className="w-[320px] lg:w-[320px] md:w-[260px] shrink-0 border-r border-gray-800 flex flex-col overflow-hidden">
       <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider
                       border-b border-gray-800 shrink-0">
         Timeline

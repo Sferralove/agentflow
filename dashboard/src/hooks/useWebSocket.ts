@@ -47,7 +47,7 @@ export function useWebSocket(): UseWebSocketReturn {
           setSessions(msg.sessions);
         }
         if (msg.type === 'event' && msg.event) {
-          setEvents(prev => [...prev.slice(-999), msg.event!]);
+          setEvents(prev => [...prev.slice(-499), msg.event!]);
         }
       } catch { /* ignore malformed messages */ }
     };
@@ -65,8 +65,10 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const subscribe = useCallback((sessionId: string) => {
     currentSession.current = sessionId;
-    setEvents([]);
-    wsRef.current?.send(JSON.stringify({ type: 'subscribe', sessionId }));
+    // Don't clear events here — handled by loading state in App.tsx
+    if (sessionId && wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'subscribe', sessionId }));
+    }
   }, []);
 
   return { events, sessions, connected, subscribe };

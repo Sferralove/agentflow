@@ -113,7 +113,12 @@ export default function FlowGraph({ events }: { events: AgentEvent[] }) {
                       border-b border-gray-800 shrink-0">
         Flow Graph
       </div>
-      <div className="flex-1">
+      <div className="flex-1 relative">
+        {graph.nodes.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-500">
+            No agent activity yet
+          </div>
+        )}
         <ReactFlow
           nodes={graph.nodes}
           edges={graph.edges}

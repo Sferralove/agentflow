@@ -66,9 +66,13 @@ function filterAndMap(raw: Record<string, unknown>): AgentEvent | null {
     || (info?.agent as string)
     || 'opencode';
 
+  // Extract parentID from SSE payload — OpenCode sets this for subagent sessions
+  const parentId = (info?.parentID as string);
+
   return {
     id: (raw.id as string) || `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     sessionId,
+    parentSessionId: parentId || undefined,
     type: EVENT_TYPE_MAP[eventType],
     agent,
     payload: raw,

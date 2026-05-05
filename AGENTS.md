@@ -1,5 +1,39 @@
 # Agent Flow Plugin — OpenCode agent monitor
 
+> **≡ Agent Behavior Rules (loaded as AI instructions)**
+
+## Session Management — ENFORCE ONE SESSION PER CHAT
+
+```plaintext
+RULE: Each OpenCode chat = ONE session. NO exceptions.
+```
+
+**Builder (root agent) must:**
+1. Generate sessionId once: `` `session-${Date.now()}-${random(6)}` ``
+   - OR detect OpenCode's native sessionId (from `session.created` event) and use that
+2. **Explicitly pass** sessionId to EVERY delegated subagent in the delegation prompt
+3. **Log all events** (start/complete/delegation) using THAT sessionId
+
+**Subagents MUST:**
+- **NEVER generate their own sessionId.** Always use the parent's.
+- Include sessionId in every `POST /api/agent/event` call
+- Include `parentSessionId` (the root sessionId) in POST body when logging events to the parent session
+- Pass the SAME sessionId to any further sub-subagents
+
+**Enforcement template — delegation prompt MUST include:**
+```
+IMPORTANT: Use sessionId "${sessionId}" for ALL event logging.
+Do NOT generate a new sessionId. This session belongs to the parent chat.
+```
+
+**Plugin safety net (since v1.1):** Even if subagents ignore the rule, the plugin auto-groups child sessions under their parent via `parentID` field in SSE events. See `GET /api/session-tree`. This is a fallback, not a replacement for correct behavior.
+
+**Violation:** Subagent that creates own sessionId fragments the dashboard. One chat = one session. Subagents are NOT independent sessions.
+
+---
+
+## Plugin docs follow below
+
 Automatic agent/subagent activity monitor + real-time React dashboard. Reads OpenCode SSE event stream — **zero agent cooperation needed**. No hooks, no plugin loading inside OpenCode.
 
 ## Build

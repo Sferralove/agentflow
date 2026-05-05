@@ -15,7 +15,7 @@ export default function StatsBar({ events, connected }: StatsBarProps) {
     const seconds = Math.floor(elapsed / 1000);
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return { total: events.length, errors, elapsed: `${mins}m ${secs}s`, first };
+    return { total: events.length, errors, elapsed: `${mins}m ${secs}s` };
   }, [events]);
 
   return (

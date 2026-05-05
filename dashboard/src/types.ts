@@ -5,6 +5,7 @@ export type EventType = 'start' | 'complete' | 'dispatch' | 'delegation' | 'task
 export interface AgentEvent {
   id: string;
   sessionId: string;
+  parentSessionId?: string;
   type: EventType;
   agent: string;
   targetAgent?: string;
@@ -20,6 +21,11 @@ export interface AgentEvent {
     contentLength?: number;
   };
   timestamp: number;
+}
+
+export interface SessionTree {
+  id: string;
+  children: string[];
 }
 
 export interface WSMessage {

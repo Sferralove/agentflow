@@ -46,15 +46,21 @@ export class DashboardServer {
     this.app.use(localhostOnly);
     this.app.use(express.json());
 
-    // API: list sessions
+    // API: list root sessions
     this.app.get('/api/sessions', (_req, res) => {
       res.json({ sessions: this.store.getSessions() });
     });
 
-    // API: get events for a session (last 500 by default)
+    // API: session tree (parent → children mapping)
+    this.app.get('/api/session-tree', (_req, res) => {
+      res.json({ tree: this.store.getSessionTree() });
+    });
+
+    // API: get events for a session (last 500 by default, includeChildren optional)
     this.app.get('/api/events/:sessionId', (req, res) => {
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 500;
-      res.json({ events: this.store.getEvents(req.params.sessionId, limit) });
+      const includeChildren = req.query.children === 'true';
+      res.json({ events: this.store.getEvents(req.params.sessionId, limit, includeChildren) });
     });
 
     // API: accept events from agents (POST) — secondary channel
@@ -68,6 +74,7 @@ export class DashboardServer {
         const agentEvent: AgentEvent = {
           id: event.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           sessionId: event.sessionId || 'default',
+          parentSessionId: event.parentSessionId,
           type: event.type,
           agent: event.agent,
           targetAgent: event.targetAgent,
@@ -153,12 +160,14 @@ export class DashboardServer {
     });
   }
 
-  /** Broadcast event to clients subscribed to matching sessionId */
+  /** Broadcast event to clients subscribed to matching sessionId (or its parent) */
   broadcast(event: AgentEvent): void {
     if (!this.wss) return;
     const data = JSON.stringify({ type: 'event', event });
-    for (const [ws, sessionId] of this.subscriptions) {
-      if (ws.readyState === WebSocket.OPEN && sessionId === event.sessionId) {
+    for (const [ws, subscribedId] of this.subscriptions) {
+      if (ws.readyState !== WebSocket.OPEN) continue;
+      // Direct match OR event belongs to a child of subscribed session
+      if (subscribedId === event.sessionId || this.store.isChildOf(event.sessionId, subscribedId)) {
         ws.send(data);
       }
     }
