@@ -15,7 +15,13 @@ npm run build    # tsc + vite (dashboard)
 
 ## Usage
 
-### 1. Start dashboard
+### 1. Avvia OpenCode con porta fissa
+
+```bash
+opencode --port 4096
+```
+
+### 2. Start dashboard
 
 ```bash
 npx @sferralove/agent-flow-plugin
@@ -29,17 +35,10 @@ Il collector tenta automaticamente la connessione SSE a `http://127.0.0.1:4096/g
 
 Il dashboard funziona in ogni caso — gli eventi arrivano anche via `POST /api/agent/event`.
 
-### 2. Se OpenCode richiede autenticazione
-
-Imposta la password come variabile d'ambiente quando avvii OpenCode:
+### 3. Se OpenCode richiede autenticazione
 
 ```bash
-OPENCODE_SERVER_PASSWORD=mypassword opencode
-```
-
-Poi avvia il dashboard con la stessa password:
-
-```bash
+OPENCODE_SERVER_PASSWORD=mypassword opencode --port 4096
 OPENCODE_SERVER_PASSWORD=mypassword npx @sferralove/agent-flow-plugin
 ```
 

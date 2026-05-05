@@ -1,7 +1,10 @@
 import type { PluginStore } from './store/index.js';
 import type { AgentEvent, EventType } from './types.js';
 
-/** Event type mapping: SSE raw event type → AgentEvent type */
+/**
+ * Known SSE event types that carry agent-flow-relevant data.
+ * Everything else is internal OpenCode noise and gets dropped.
+ */
 const EVENT_TYPE_MAP: Record<string, EventType> = {
   'session.created': 'start',
   'session.idle': 'complete',
@@ -26,16 +29,39 @@ function extractSessionId(raw: Record<string, unknown>): string {
     || 'unknown';
 }
 
-/** Map raw SSE event to internal AgentEvent */
-function toAgentEvent(raw: Record<string, unknown>): AgentEvent {
-  const eventType = (raw.type as string) || 'unknown';
+/** Throttle state for high-frequency events */
+const throttleTimers = new Map<string, number>();
+function isThrottled(key: string, minIntervalMs: number): boolean {
+  const now = Date.now();
+  const last = throttleTimers.get(key) || 0;
+  if (now - last < minIntervalMs) return true;
+  throttleTimers.set(key, now);
+  return false;
+}
+
+/**
+ * Decide if an event should be kept or dropped.
+ * Returns AgentEvent if event passes filter, null if noise.
+ */
+function filterAndMap(raw: Record<string, unknown>): AgentEvent | null {
+  const eventType = (raw.type as string) || '';
+
+  // Drop unknown event types — they're internal OpenCode noise
+  if (!EVENT_TYPE_MAP[eventType]) return null;
+
+  // Throttle message.updated: max once per 2s per session (prevents streaming flood)
+  if (eventType === 'message.updated') {
+    const sessionId = extractSessionId(raw);
+    if (isThrottled(`msg:${sessionId}`, 2000)) return null;
+  }
+
   const sessionId = extractSessionId(raw);
   const agent = (raw.tool as string) || (raw.command as string) || (raw.title as string) || 'opencode';
 
   return {
     id: (raw.id as string) || `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     sessionId,
-    type: EVENT_TYPE_MAP[eventType] || 'message',
+    type: EVENT_TYPE_MAP[eventType],
     agent,
     payload: raw,
     timestamp: Date.now(),
@@ -79,7 +105,7 @@ function connectErrorMsg(err: unknown): string {
     const cause = (err as Error & { cause?: { code?: string } }).cause;
     const code = cause?.code || '';
     if (code === 'ECONNREFUSED' || err.message.includes('ECONNREFUSED')) {
-      return 'OpenCode server not running. Start OpenCode first.';
+      return 'OpenCode server not found. Run: opencode --port 4096';
     }
   }
   return 'Connection failed. Retrying...';
@@ -87,8 +113,7 @@ function connectErrorMsg(err: unknown): string {
 
 /**
  * Build SSE collector that feeds events into the store and optionally broadcasts them.
- * Auto-detects auth: tries without credentials first, then with if provided.
- * Includes automatic reconnection with exponential backoff.
+ * Auto-detects auth, auto-filters noise, auto-reconnects.
  */
 export function buildCollector(
   store: PluginStore,
@@ -117,13 +142,12 @@ export function buildCollector(
         const msg = connectErrorMsg(err);
         console.error(`[agent-flow] ${msg}`);
 
-        // Don't spam retries on auth failures
         if (msg.includes('Authentication required')) {
           if (!authFailed) {
             authFailed = true;
             console.error('[agent-flow] Set OPENCODE_SERVER_PASSWORD and restart.');
           }
-          backoff = 30000; // Check every 30s if password was set
+          backoff = 30000;
         }
       }
 
@@ -187,9 +211,11 @@ export function buildCollector(
           const events = parseSSEChunk(chunk);
           for (const raw of events) {
             try {
-              const event = toAgentEvent(raw);
-              await store.addEvent(event);
-              broadcaster?.(event);
+              const event = filterAndMap(raw);
+              if (event) {
+                await store.addEvent(event);
+                broadcaster?.(event);
+              }
             } catch {
               // Skip malformed events — don't crash the stream
             }
@@ -203,6 +229,7 @@ export function buildCollector(
 
   function connect(url: string, username?: string, password?: string): void {
     running = true;
+    throttleTimers.clear(); // Reset throttle on reconnect
     connectWithRetry(url, username, password).catch((err) => {
       console.error('[agent-flow] Collector fatal error:', err);
     });
@@ -210,6 +237,7 @@ export function buildCollector(
 
   function disconnect(): void {
     running = false;
+    throttleTimers.clear();
     abortController?.abort();
     abortController = null;
   }
