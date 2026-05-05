@@ -4,6 +4,7 @@
 
 import type { Server } from 'bun'
 import type { AgentEvent, SessionGraph, AgentNode, AgentEdge } from './types.js'
+import { readdirSync, readFileSync, existsSync } from 'node:fs'
 
 const SESSIONS_DIR = '.agentflow/sessions'
 const PID_FILE = '.agentflow/pid'
@@ -61,12 +62,14 @@ function processEvent(evt: AgentEvent): void {
     ensureNode(graph, subagent, 'subagent', evt.agent)
     updateNodeStatus(graph, subagent, 'running')
 
-    graph.edges.push({
-      id: evt.id,
-      source: evt.agent,
-      target: subagent,
-      description,
-    })
+    if (!graph.edges.some(e => e.source === evt.agent && e.target === subagent)) {
+      graph.edges.push({
+        id: evt.id,
+        source: evt.agent,
+        target: subagent,
+        description,
+      })
+    }
   }
 
   // Tool end: update subagent status
@@ -115,39 +118,56 @@ function removeClient(sessionId: string, controller: ReadableStreamDefaultContro
   if (clients.get(sessionId)?.size === 0) clients.delete(sessionId)
 }
 
+// ─── Path Sanitization ───
+
+function sanitizeSessionId(id: string): string {
+  // Allow only alphanumeric, dash, underscore. Max 128 chars.
+  return id.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128)
+}
+
+function sanitizeFilePath(path: string): string {
+  // Remove path traversal sequences
+  return path.replace(/\.\./g, '').replace(/\/+/g, '/').replace(/[^a-zA-Z0-9_./-]/g, '')
+}
+
 // ─── File Watcher (polling, 500ms) ───
 
 let fileWatcher: ReturnType<typeof setInterval> | null = null
+const readOffsets = new Map<string, number>() // file → last read position
 
 function startWatching(): void {
   if (fileWatcher) return
-  const lastSizes = new Map<string, number>()
-  fileWatcher = setInterval(async () => {
+  fileWatcher = setInterval(() => {
     try {
-      const dir = Bun.file(SESSIONS_DIR)
-      if (!(await dir.exists())) return
-      for await (const entry of (dir as any).values?.() ?? []) {
-        const name = entry?.name
-        if (!name?.endsWith('.jsonl')) continue
+      if (!existsSync(SESSIONS_DIR)) return
+      const entries = readdirSync(SESSIONS_DIR)
+      for (const name of entries) {
+        if (!name.endsWith('.jsonl')) continue
         const fullPath = `${SESSIONS_DIR}/${name}`
-        const file = Bun.file(fullPath)
-        const size = await file.size
-        const last = lastSizes.get(name) || 0
-        if (size === last) continue
-        lastSizes.set(name, size)
+        const sessionId = sanitizeSessionId(name.replace('.jsonl', ''))
+        if (!sessionId) continue
 
-        const text = await file.text()
-        const lines = text.trim().split('\n')
-        const sessionId = name.replace('.jsonl', '')
+        // Read only new bytes since last check (tail)
+        const size = Bun.file(fullPath).size
+        const offset = readOffsets.get(name) || 0
+        if (size <= offset) continue
+        readOffsets.set(name, size)
 
-        for (const line of lines) {
-          if (!line.trim()) continue
-          try {
-            const evt: AgentEvent = JSON.parse(line)
-            processEvent(evt)
-            broadcast(sessionId, line)
-          } catch { /* skip malformed */ }
-        }
+        // Read from offset to end
+        try {
+          const fd = readFileSync(fullPath, 'utf-8')
+          const newContent = fd.slice(offset)
+          const lines = newContent.trim().split('\n')
+
+          for (const line of lines) {
+            if (!line.trim()) continue
+            try {
+              const evt: AgentEvent = JSON.parse(line)
+              processEvent(evt)
+              broadcast(sessionId, line)
+            } catch { /* skip malformed */ }
+          }
+        } catch { /* file read error */ }
       }
     } catch { /* session dir might not exist yet */ }
   }, 500)
@@ -175,28 +195,31 @@ async function handleRequest(req: Request): Promise<Response> {
 
   // SSE stream endpoint
   if (url.pathname === '/api/stream') {
-    const sessionId = url.searchParams.get('session')
-    if (!sessionId) return new Response('Missing session param', { status: 400, headers: corsHeaders })
+    const raw = url.searchParams.get('session')
+    if (!raw) return new Response('Missing session param', { status: 400, headers: corsHeaders })
+    const sessionId = sanitizeSessionId(raw)
+    if (!sessionId) return new Response('Invalid session param', { status: 400, headers: corsHeaders })
 
     const stream = new ReadableStream({
       start(controller) {
-        addClient(sessionId!, controller)
+          addClient(sessionId, controller)
 
-        // Replay: send all existing events for this session
-        const file = Bun.file(`${SESSIONS_DIR}/${sessionId}.jsonl`)
-        file.text().then(text => {
-          const lines = text.trim().split('\n')
-          for (const line of lines) {
-            if (!line.trim()) continue
-            try {
-              processEvent(JSON.parse(line))
-              controller.enqueue(`data: ${line}\n\n`)
-            } catch { /* skip */ }
-          }
-        }).catch(() => {})
-      },
-      cancel(controller) {
-        removeClient(sessionId!, controller)
+          // Replay: send all existing events for this session
+          const replayFile = `${SESSIONS_DIR}/${sessionId}.jsonl`
+          const file = Bun.file(replayFile)
+          file.text().then(text => {
+            const lines = text.trim().split('\n')
+            for (const line of lines) {
+              if (!line.trim()) continue
+              try {
+                processEvent(JSON.parse(line))
+                controller.enqueue(`data: ${line}\n\n`)
+              } catch { /* skip */ }
+            }
+          }).catch(() => {})
+        },
+        cancel(controller) {
+          removeClient(sessionId, controller)
       },
     })
 
@@ -212,9 +235,11 @@ async function handleRequest(req: Request): Promise<Response> {
 
   // GET events for session with optional since filter
   if (url.pathname === '/api/events') {
-    const sessionId = url.searchParams.get('session')
+    const raw = url.searchParams.get('session')
+    if (!raw) return new Response('Missing session param', { status: 400, headers: corsHeaders })
+    const sessionId = sanitizeSessionId(raw)
+    if (!sessionId) return new Response('Invalid session param', { status: 400, headers: corsHeaders })
     const since = parseInt(url.searchParams.get('since') || '0', 10)
-    if (!sessionId) return new Response('Missing session param', { status: 400, headers: corsHeaders })
 
     try {
       const file = Bun.file(`${SESSIONS_DIR}/${sessionId}.jsonl`)
@@ -233,7 +258,9 @@ async function handleRequest(req: Request): Promise<Response> {
 
   // GET agent graph for session
   if (url.pathname.startsWith('/api/agents/')) {
-    const sessionId = url.pathname.replace('/api/agents/', '')
+    const raw = url.pathname.replace('/api/agents/', '')
+    const sessionId = sanitizeSessionId(raw)
+    if (!sessionId) return new Response('Invalid session param', { status: 400, headers: corsHeaders })
     const graph = graphs.get(sessionId)
     return new Response(JSON.stringify(graph || { nodes: [], edges: [] }), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -242,7 +269,9 @@ async function handleRequest(req: Request): Promise<Response> {
 
   // Serve dashboard static files
   try {
-    let filePath = url.pathname === '/' ? '/index.html' : url.pathname
+    let filePath = url.pathname === '/' ? '/index.html' : sanitizeFilePath(url.pathname)
+    if (!filePath) throw new Error('Invalid path')
+    if (!filePath.startsWith('/')) filePath = '/' + filePath
     const file = Bun.file(`${DASHBOARD_DIR}${filePath}`)
     if (await file.exists()) {
       const ext = filePath.split('.').pop()
