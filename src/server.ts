@@ -44,6 +44,7 @@ export class DashboardServer {
 
     // Security: reject non-localhost requests on all routes
     this.app.use(localhostOnly);
+    this.app.use(express.json());
 
     // API: list sessions
     this.app.get('/api/sessions', (_req, res) => {
@@ -53,6 +54,32 @@ export class DashboardServer {
     // API: get events for a session
     this.app.get('/api/events/:sessionId', (req, res) => {
       res.json({ events: this.store.getEvents(req.params.sessionId) });
+    });
+
+    // API: accept events from agents (POST)
+    this.app.post('/api/agent/event', async (req, res) => {
+      try {
+        const event = req.body;
+        if (!event || !event.type || !event.agent) {
+          res.status(400).json({ error: 'Missing required fields: type, agent' });
+          return;
+        }
+        const agentEvent: import('./types.js').AgentEvent = {
+          id: event.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          sessionId: event.sessionId || 'default',
+          type: event.type,
+          agent: event.agent,
+          targetAgent: event.targetAgent,
+          payload: event.payload || {},
+          timestamp: event.timestamp || Date.now(),
+        };
+        await this.store.addEvent(agentEvent);
+        this.broadcast(agentEvent);
+        res.json({ ok: true });
+      } catch (err) {
+        console.error('[agent-flow] Error processing event POST:', err);
+        res.status(500).json({ error: 'Internal error' });
+      }
     });
   }
 
