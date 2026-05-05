@@ -111,6 +111,11 @@ export class DashboardServer {
       },
     });
 
+    // Suppress WS errors — they propagate from the HTTP server which already handles them
+    this.wss.on('error', () => {
+      // EADDRINUSE and other listen errors handled by HTTP server listener below
+    });
+
     this.wss.on('connection', (ws: WebSocket) => {
       // Send initial session list
       ws.send(JSON.stringify({ type: 'sessionList', sessions: this.store.getSessions() }));
@@ -135,7 +140,8 @@ export class DashboardServer {
 
     this.server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
-        console.error(`[agent-flow] Port ${this.config.port} in use. Dashboard unavailable.`);
+        console.error(`[agent-flow] Port ${this.config.port} already in use.`);
+        console.error(`[agent-flow] Kill the other process or use: PORT=${this.config.port + 1} npx @sferralove/agent-flow-plugin`);
       } else {
         console.error('[agent-flow] Server error:', err.message);
       }
