@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.agentflow/
+*.tgz
+.opencode/
+.worktrees/
+.superpowers/
+dashboard/dist/
