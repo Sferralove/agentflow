@@ -1,20 +1,31 @@
+import { tool as defineTool } from '@opencode-ai/plugin';
 import type { PluginStore } from '../store/index.js';
 
-/** Custom tools exposed by the plugin — agents can query the monitor directly */
-export function createTools(store: PluginStore) {
+const z: typeof defineTool.schema = defineTool.schema;
+
+interface EventsArgs {
+  sessionId?: string;
+  limit?: number;
+}
+
+interface StatsArgs {
+  sessionId?: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function createTools(store: PluginStore): any {
   return {
-    'agentflow_events': {
-      description: 'Query agent-flow events for a session. Returns events from the monitoring store.',
+    agentflow_events: defineTool({
+      description: 'Query agent-flow events for a session',
       args: {
-        sessionId: { type: 'string', description: 'Session ID to query (optional, defaults to current session)' },
-        limit: { type: 'number', description: 'Max events to return (default 50)' },
+        sessionId: z.string().optional().describe('Session ID (optional)'),
+        limit: z.number().optional().describe('Max events (default 50)'),
       },
-      async execute(args: { sessionId?: string; limit?: number }) {
+      async execute(args: EventsArgs) {
         const sessionId = args.sessionId;
         const limit = args.limit || 50;
 
         if (!sessionId) {
-          // Return recent events from all sessions
           const sessions = store.getSessions();
           const allEvents = sessions.flatMap(s => store.getEvents(s))
             .sort((a, b) => b.timestamp - a.timestamp)
@@ -25,23 +36,23 @@ export function createTools(store: PluginStore) {
         const events = store.getEvents(sessionId).slice(-limit);
         return JSON.stringify(events, null, 2);
       },
-    },
+    }),
 
-    'agentflow_sessions': {
+    agentflow_sessions: defineTool({
       description: 'List all monitored agent-flow sessions',
       args: {},
       async execute() {
         const sessions = store.getSessions();
         return JSON.stringify({ sessions, count: sessions.length }, null, 2);
       },
-    },
+    }),
 
-    'agentflow_stats': {
-      description: 'Get statistics for the current agent-flow monitoring',
+    agentflow_stats: defineTool({
+      description: 'Get agent-flow monitoring statistics',
       args: {
-        sessionId: { type: 'string', description: 'Session ID (optional, defaults to all sessions)' },
+        sessionId: z.string().optional().describe('Session ID (optional)'),
       },
-      async execute(args: { sessionId?: string }) {
+      async execute(args: StatsArgs) {
         const sessionId = args.sessionId;
         const events = sessionId
           ? store.getEvents(sessionId)
@@ -66,6 +77,6 @@ export function createTools(store: PluginStore) {
           lastEvent: events[events.length - 1]?.timestamp,
         }, null, 2);
       },
-    },
+    }),
   };
 }
