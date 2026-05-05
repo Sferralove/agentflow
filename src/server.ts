@@ -267,6 +267,22 @@ async function handleRequest(req: Request): Promise<Response> {
     })
   }
 
+  // GET list of available sessions
+  if (url.pathname === '/api/sessions') {
+    try {
+      const files = readdirSync(SESSIONS_DIR)
+        .filter(f => f.endsWith('.jsonl'))
+        .map(f => f.replace('.jsonl', ''))
+      return new Response(JSON.stringify({ sessions: files }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      })
+    } catch {
+      return new Response(JSON.stringify({ sessions: [] }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      })
+    }
+  }
+
   // Serve dashboard static files
   try {
     let filePath = url.pathname === '/' ? '/index.html' : sanitizeFilePath(url.pathname)
@@ -296,6 +312,7 @@ export function startServer(port: number = 3001): void {
   server = Bun.serve({
     port,
     fetch: handleRequest,
+    idleTimeout: 0, // disable timeout for long-lived SSE connections
   })
   console.log(`[agentflow] Server started on http://localhost:${port}`)
 
