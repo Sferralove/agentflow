@@ -1,5 +1,5 @@
 {
-  "name": "agentflow",
+  "name": "@sferralove/agentflow",
   "version": "3.0.0",
   "description": "OpenCode agent flow monitor v2 — plugin + server + dashboard",
   "type": "module",
