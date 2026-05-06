@@ -4,6 +4,7 @@
 
 import type { Plugin } from "@opencode-ai/plugin"
 import type { FileSink } from "bun"
+import { ToolTimer } from './toolTiming.js'
 
 const LOG_DIR = '.agentflow/sessions'
 const TOOLS_TRACKED = new Set(['task', 'write', 'edit', 'bash'])
@@ -12,7 +13,7 @@ const FLUSH_DEBOUNCE_MS = 250
 
 const writers = new Map<string, FileSink>()
 const flushTimers = new Map<string, ReturnType<typeof setTimeout>>()
-const startTimes = new Map<string, number>()
+const toolTimer = new ToolTimer()
 let cleanupRegistered = false
 
 function extractSessionId(raw: Record<string, unknown>): string {
@@ -38,8 +39,23 @@ function generateId(): string {
   return `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
-function makeStartTimeKey(sessionId: string, tool: string): string {
-  return `${sessionId}:${tool}`
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : undefined
+}
+
+function extractToolCallId(...records: Array<Record<string, unknown> | undefined>): string | undefined {
+  const keys = ['id', 'callId', 'callID', 'toolCallId', 'toolCallID', 'invocationId']
+  for (const record of records) {
+    if (!record) continue
+    for (const key of keys) {
+      const value = record[key]
+      if (typeof value === 'string' && value) return value
+    }
+    const props = asRecord(record.properties)
+    const nested = extractToolCallId(props, asRecord(record.metadata))
+    if (nested) return nested
+  }
+  return undefined
 }
 
 async function flushWriter(sid: string): Promise<void> {
@@ -108,13 +124,14 @@ export const server: Plugin = async ({ directory }) => ({
 
     const raw = input as Record<string, unknown>
     const sid = extractSessionId(raw)
-    startTimes.set(makeStartTimeKey(sid, tool), Date.now())
+    const now = Date.now()
+    toolTimer.start(sid, tool, extractToolCallId(raw, asRecord(output)), now)
 
     await writeEvent({
       type: 'tool.start',
       id: generateId(),
       sessionId: sid,
-      timestamp: Date.now(),
+      timestamp: now,
       agent: extractAgent(raw),
       tool,
       input: tool === 'task'
@@ -129,16 +146,14 @@ export const server: Plugin = async ({ directory }) => ({
 
     const raw = input as Record<string, unknown>
     const sid = extractSessionId(raw)
-    const key = makeStartTimeKey(sid, tool)
-    const started = startTimes.get(key)
-    startTimes.delete(key)
-    const duration: number | undefined = started ? Date.now() - started : undefined
+    const now = Date.now()
+    const duration = toolTimer.end(sid, tool, extractToolCallId(raw, asRecord(output)), now)
 
     await writeEvent({
       type: 'tool.end',
       id: generateId(),
       sessionId: sid,
-      timestamp: Date.now(),
+      timestamp: now,
       agent: extractAgent(raw),
       tool,
       duration,

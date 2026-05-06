@@ -29,6 +29,7 @@ export interface AgentNode {
   status: AgentStatus
   sessionId: string
   startedAt: number
+  lastSeenAt?: number
   completedAt?: number
   tasksCompleted: number
   tasksFailed: number

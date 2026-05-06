@@ -17,7 +17,14 @@ const clients = new Map<string, Set<ReadableStreamDefaultController>>()
 
 // ─── Event Processing ───
 
-function ensureNode(graph: SessionGraph, id: string, type: 'main' | 'subagent', parentId?: string): AgentNode {
+function ensureNode(
+  graph: SessionGraph,
+  id: string,
+  type: 'main' | 'subagent',
+  parentId?: string,
+  sessionId?: string,
+  timestamp: number = Date.now(),
+): AgentNode {
   let node = graph.nodes.find(n => n.id === id)
   if (!node) {
     node = {
@@ -26,41 +33,52 @@ function ensureNode(graph: SessionGraph, id: string, type: 'main' | 'subagent', 
       type,
       parentId,
       status: 'idle',
-      sessionId: graph.nodes[0]?.sessionId || '',
-      startedAt: Date.now(),
+      sessionId: sessionId || graph.nodes[0]?.sessionId || '',
+      startedAt: timestamp,
+      lastSeenAt: timestamp,
       tasksCompleted: 0,
       tasksFailed: 0,
     }
     graph.nodes.push(node)
+  } else {
+    const wasSubagent = node.type === 'subagent'
+    if (type === 'subagent') node.type = 'subagent'
+    if (parentId && !node.parentId) node.parentId = parentId
+    if (
+      sessionId &&
+      (
+        node.sessionId === '' ||
+        (wasSubagent && type === 'main' && node.sessionId !== sessionId)
+      )
+    ) {
+      node.sessionId = sessionId
+    }
+    node.lastSeenAt = Math.max(node.lastSeenAt || node.startedAt, timestamp)
   }
   return node
 }
 
-function updateNodeStatus(graph: SessionGraph, id: string, status: AgentNode['status']): void {
+function updateNodeStatus(graph: SessionGraph, id: string, status: AgentNode['status'], timestamp: number = Date.now()): void {
   const node = graph.nodes.find(n => n.id === id)
   if (!node) return
   node.status = status
+  node.lastSeenAt = Math.max(node.lastSeenAt || node.startedAt, timestamp)
   if (status === 'completed' || status === 'error') {
-    node.completedAt = Date.now()
+    node.completedAt = timestamp
   }
 }
 
-function processEvent(evt: AgentEvent): void {
-  let graph = graphs.get(evt.sessionId)
-  if (!graph) {
-    graph = { nodes: [], edges: [] }
-    graphs.set(evt.sessionId, graph)
-  }
-
+export function applyEventToGraph(graph: SessionGraph, evt: AgentEvent): void {
   // Tool start: track task delegation
   if (evt.type === 'tool.start' && evt.tool === 'task' && evt.input) {
     const subagent = evt.input.subagent_type as string
     const description = (evt.input.description as string) || 'delegated task'
     if (!subagent) return
 
-    ensureNode(graph, evt.agent, 'main')
-    ensureNode(graph, subagent, 'subagent', evt.agent)
-    updateNodeStatus(graph, subagent, 'running')
+    ensureNode(graph, evt.agent, 'main', undefined, evt.sessionId, evt.timestamp)
+    updateNodeStatus(graph, evt.agent, 'running', evt.timestamp)
+    ensureNode(graph, subagent, 'subagent', evt.agent, evt.sessionId, evt.timestamp)
+    updateNodeStatus(graph, subagent, 'running', evt.timestamp)
 
     if (!graph.edges.some(e => e.source === evt.agent && e.target === subagent)) {
       graph.edges.push({
@@ -70,32 +88,97 @@ function processEvent(evt: AgentEvent): void {
         description,
       })
     }
+    return
   }
 
-  // Tool end: update subagent status
+  if (evt.type === 'tool.start' && evt.tool) {
+    ensureNode(graph, evt.agent, 'main', undefined, evt.sessionId, evt.timestamp)
+    updateNodeStatus(graph, evt.agent, 'running', evt.timestamp)
+    return
+  }
+
+  // Tool end: update emitting agent metrics. Delegation calls should not
+  // complete the parent agent; session lifecycle events decide final state.
   if (evt.type === 'tool.end' && evt.tool === 'task') {
-    const status = evt.error ? 'error' : 'completed'
-    updateNodeStatus(graph, evt.agent, status)
-    const node = graph.nodes.find(n => n.id === evt.agent)
-    if (node) {
-      if (status === 'completed') node.tasksCompleted++
-      else node.tasksFailed++
+    const node = ensureNode(graph, evt.agent, 'main', undefined, evt.sessionId, evt.timestamp)
+    if (evt.error) {
+      node.tasksFailed++
+      updateNodeStatus(graph, evt.agent, 'error', evt.timestamp)
+    } else {
+      node.tasksCompleted++
+      if (node.status === 'idle') updateNodeStatus(graph, evt.agent, 'running', evt.timestamp)
     }
+    return
+  }
+
+  if (evt.type === 'tool.end' && evt.tool) {
+    const node = ensureNode(graph, evt.agent, 'main', undefined, evt.sessionId, evt.timestamp)
+    if (evt.error) {
+      node.tasksFailed++
+      updateNodeStatus(graph, evt.agent, 'error', evt.timestamp)
+    } else {
+      node.tasksCompleted++
+      updateNodeStatus(graph, evt.agent, 'completed', evt.timestamp)
+    }
+    return
   }
 
   // Session lifecycle
   if (evt.type === 'session.created') {
-    ensureNode(graph, evt.agent || 'builder', 'main')
+    ensureNode(graph, evt.agent || 'builder', 'main', undefined, evt.sessionId, evt.timestamp)
   }
   if (evt.type === 'session.error') {
-    updateNodeStatus(graph, evt.agent || 'builder', 'error')
+    updateNodeStatus(graph, evt.agent || 'builder', 'error', evt.timestamp)
   }
   if (evt.type === 'session.compacted') {
-    updateNodeStatus(graph, evt.agent || 'builder', 'compacted')
+    updateNodeStatus(graph, evt.agent || 'builder', 'compacted', evt.timestamp)
   }
   if (evt.type === 'session.idle') {
-    if (evt.agent) updateNodeStatus(graph, evt.agent, 'completed')
+    if (evt.agent) updateNodeStatus(graph, evt.agent, 'completed', evt.timestamp)
   }
+}
+
+export function buildGraphFromEvents(events: AgentEvent[]): SessionGraph {
+  const graph: SessionGraph = { nodes: [], edges: [] }
+  for (const evt of events.slice().sort((a, b) => a.timestamp - b.timestamp)) {
+    applyEventToGraph(graph, evt)
+  }
+  return graph
+}
+
+export function classifySessions(eventsBySession: Record<string, AgentEvent[]>): Array<{ id: string; type: 'parent' | 'child' }> {
+  return Object.entries(eventsBySession)
+    .map(([id, events]) => {
+      const hasDelegation = events.some(event => (
+        event.type === 'tool.start' &&
+        event.tool === 'task' &&
+        Boolean(event.input?.subagent_type)
+      ))
+      const firstTimestamp = events.reduce(
+        (min, event) => Math.min(min, event.timestamp),
+        Number.POSITIVE_INFINITY,
+      )
+      return {
+        id,
+        type: hasDelegation ? 'parent' as const : 'child' as const,
+        firstTimestamp: Number.isFinite(firstTimestamp) ? firstTimestamp : 0,
+      }
+    })
+    .sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'parent' ? -1 : 1
+      return a.firstTimestamp - b.firstTimestamp || a.id.localeCompare(b.id)
+    })
+    .map(({ id, type }) => ({ id, type }))
+}
+
+function processEvent(evt: AgentEvent): void {
+  let graph = graphs.get(evt.sessionId)
+  if (!graph) {
+    graph = { nodes: [], edges: [] }
+    graphs.set(evt.sessionId, graph)
+  }
+
+  applyEventToGraph(graph, evt)
 }
 
 // ─── SSE Broadcast ───
@@ -134,6 +217,29 @@ function sanitizeFilePath(path: string): string {
 
 let fileWatcher: ReturnType<typeof setInterval> | null = null
 const readOffsets = new Map<string, number>() // file → last read position
+
+async function readEventsFromFile(sessionId: string, since: number = 0): Promise<AgentEvent[]> {
+  try {
+    const text = await Bun.file(`${SESSIONS_DIR}/${sessionId}.jsonl`).text()
+    return text.trim().split('\n')
+      .filter(l => l.trim())
+      .map(l => JSON.parse(l))
+      .filter((event: AgentEvent) => event.timestamp >= since)
+  } catch {
+    return []
+  }
+}
+
+async function readEventsBySession(since: number = 0): Promise<Record<string, AgentEvent[]>> {
+  const eventsBySession: Record<string, AgentEvent[]> = {}
+  const files = readdirSync(SESSIONS_DIR).filter(f => f.endsWith('.jsonl'))
+  for (const name of files) {
+    const sessionId = sanitizeSessionId(name.replace('.jsonl', ''))
+    if (!sessionId) continue
+    eventsBySession[sessionId] = await readEventsFromFile(sessionId, since)
+  }
+  return eventsBySession
+}
 
 function startWatching(): void {
   if (fileWatcher) return
@@ -247,24 +353,10 @@ async function handleRequest(req: Request): Promise<Response> {
 
       if (tree) {
         // Merge events from ALL sessions for unified timeline
-        const files = readdirSync(SESSIONS_DIR).filter(f => f.endsWith('.jsonl'))
-        for (const name of files) {
-          try {
-            const text = await Bun.file(`${SESSIONS_DIR}/${name}`).text()
-            const events = text.trim().split('\n')
-              .filter(l => l.trim())
-              .map(l => JSON.parse(l))
-              .filter((e: AgentEvent) => e.timestamp >= since)
-            allEvents.push(...events)
-          } catch {}
-        }
+        const eventsBySession = await readEventsBySession(since)
+        allEvents = Object.values(eventsBySession).flat()
       } else {
-        const file = Bun.file(`${SESSIONS_DIR}/${sessionId}.jsonl`)
-        const text = await file.text()
-        allEvents = text.trim().split('\n')
-          .filter(l => l.trim())
-          .map(l => JSON.parse(l))
-          .filter((e: AgentEvent) => e.timestamp >= since)
+        allEvents = await readEventsFromFile(sessionId, since)
       }
 
       // Sort merged events by timestamp
@@ -283,7 +375,10 @@ async function handleRequest(req: Request): Promise<Response> {
     const raw = url.pathname.replace('/api/agents/', '')
     const sessionId = sanitizeSessionId(raw)
     if (!sessionId) return new Response('Invalid session param', { status: 400, headers: corsHeaders })
-    const graph = graphs.get(sessionId)
+    const tree = url.searchParams.get('tree') === 'true'
+    const graph = tree
+      ? buildGraphFromEvents(Object.values(await readEventsBySession()).flat())
+      : graphs.get(sessionId)
     return new Response(JSON.stringify(graph || { nodes: [], edges: [] }), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     })
@@ -292,16 +387,7 @@ async function handleRequest(req: Request): Promise<Response> {
   // GET list of available sessions
   if (url.pathname === '/api/sessions') {
     try {
-      const files = readdirSync(SESSIONS_DIR)
-        .filter(f => f.endsWith('.jsonl'))
-        .map(f => f.replace('.jsonl', ''))
-        .sort()
-
-      // First session is the parent, rest are children
-      const sessions = files.map((id, i) => ({
-        id,
-        type: i === 0 ? 'parent' : 'child' as const,
-      }))
+      const sessions = classifySessions(await readEventsBySession())
 
       return new Response(JSON.stringify({ sessions }), {
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
