@@ -1,8 +1,51 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+dashboard/dist/
+
+# Runtime data
 .agentflow/
 *.tgz
+
+# OpenCode plugin output
 .opencode/
+
+# Git worktrees
 .worktrees/
+
+# Superpowers agent state
 .superpowers/
-dashboard/dist/
+
+# macOS
+**/.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.editorconfig
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Coverage
+coverage/
+
+# Temporary
+tmp/
+.tmp/

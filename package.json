@@ -1,8 +1,16 @@
 {
   "name": "@sferralove/agentflow",
   "version": "3.1.0",
-  "description": "OpenCode agent flow monitor v2 — plugin + server + dashboard",
+  "description": "Live trace & observability for OpenCode agent workflows — plugin, server, and dashboard",
   "type": "module",
+  "homepage": "https://github.com/Sferralove/agentflow",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sferralove/agentflow"
+  },
+  "bugs": {
+    "url": "https://github.com/Sferralove/agentflow/issues"
+  },
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js"
@@ -32,9 +40,16 @@
   },
   "keywords": [
     "opencode",
-    "plugin",
+    "opencode-plugin",
+    "agent-orchestration",
+    "observability",
+    "trace",
     "monitoring",
-    "agent-flow"
+    "dashboard",
+    "real-time",
+    "agent-flow",
+    "sse",
+    "bun"
   ],
   "license": "MIT"
 }
