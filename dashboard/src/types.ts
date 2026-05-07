@@ -48,3 +48,89 @@ export const STATUS_COLORS: Record<AgentStatus, string> = {
   error: '#ef4444',
   compacted: '#8b5cf6',
 }
+
+// ─── Trace Engine Types (v1) ───
+
+export type RunStatus = 'running' | 'completed' | 'error' | 'interrupted';
+export type TraceStatus = 'pending' | 'running' | 'completed' | 'failed' | 'stale';
+
+export interface RunArtifact {
+  text: string;
+  timestamp: number;
+  sourceEventIds: string[];
+  confidence: 'observed' | 'inferred' | 'missing';
+}
+
+export interface Run {
+  id: string;
+  title: string;
+  rootSessionId: string;
+  status: RunStatus;
+  startedAt: number;
+  completedAt?: number;
+  lastSeenAt: number;
+  userInput?: RunArtifact;
+  finalResponse?: RunArtifact;
+}
+
+export interface TraceNode {
+  id: string;
+  runId: string;
+  kind:
+    | 'user_input'
+    | 'agent_work'
+    | 'delegation'
+    | 'tool_invocation'
+    | 'file_operation'
+    | 'command'
+    | 'error'
+    | 'final_response';
+  parentId?: string;
+  title: string;
+  status: TraceStatus;
+  startedAt?: number;
+  endedAt?: number;
+  sessionId?: string;
+  agentInstanceId?: string;
+  sourceEventIds: string[];
+  confidence: 'observed' | 'inferred';
+}
+
+export interface TimelineItem {
+  id: string;
+  runId: string;
+  traceNodeId?: string;
+  eventId: string;
+  timestamp: number;
+  title: string;
+  detail?: string;
+  kind: string;
+  status: TraceStatus;
+  sourceEventIds: string[];
+}
+
+export interface RunSnapshot {
+  run: Run;
+  lastSequence: number;
+  rawEvents: AgentEvent[];
+  normalizedEvents: unknown[];
+  traceNodes: TraceNode[];
+  timelineItems: TimelineItem[];
+  graph: SessionGraph;
+}
+
+export interface PatchEnvelope<T = unknown> {
+  id: string;
+  runId: string;
+  sequence: number;
+  emittedAt: number;
+  type:
+    | 'raw.event'
+    | 'timeline.item.upserted'
+    | 'trace.node.upserted'
+    | 'trace.node.completed'
+    | 'graph.node.upserted'
+    | 'graph.edge.upserted'
+    | 'run.updated';
+  payload: T;
+}
