@@ -67,36 +67,33 @@ export function useRunTrace() {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastSequence = useRef(0);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sseRef = useRef<EventSource | null>(null);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
 
-  const loadSnapshot = useCallback(() => {
-    fetch('/api/runs/current')
-      .then((response) => response.json())
-      .then((data) => {
-        if (!data || !data.run) {
-          setSnapshot(null);
-          return;
-        }
-        setSnapshot(data as RunSnapshot);
-        lastSequence.current = (data as RunSnapshot).lastSequence || 0;
-      })
-      .catch(() => setError('Unable to load current run'));
-  }, []);
-
-  useEffect(() => {
-    loadSnapshot();
-  }, [loadSnapshot]);
-
-  useEffect(() => {
+  const connectSSE = useCallback(() => {
+    if (!mountedRef.current) return;
+    sseRef.current?.close();
     const source = new EventSource(`/api/stream?run=current&after=${lastSequence.current}`);
+    sseRef.current = source;
+
     source.onopen = () => {
+      if (!mountedRef.current) { source.close(); return; }
       setConnected(true);
       setError(null);
     };
+
     source.onerror = () => {
+      if (!mountedRef.current) { source.close(); return; }
       setConnected(false);
-      setError('Trace stream disconnected');
+      source.close();
+      sseRef.current = null;
+      reconnectRef.current = setTimeout(connectSSE, 2000);
     };
+
     source.onmessage = (message) => {
+      if (!mountedRef.current) return;
       const patch = JSON.parse(message.data) as PatchEnvelope;
       lastSequence.current = Math.max(lastSequence.current, patch.sequence);
       setSnapshot((current) => {
@@ -104,14 +101,62 @@ export function useRunTrace() {
         return applyPatch(current, patch);
       });
     };
+
     source.addEventListener('run.updated', ((message: MessageEvent) => {
+      if (!mountedRef.current) return;
       const patch = JSON.parse(message.data) as PatchEnvelope;
       lastSequence.current = Math.max(lastSequence.current, patch.sequence);
       setSnapshot((current) => current ? applyPatch(current, patch) : current);
     }) as EventListener);
+  }, []);
+
+  const pollForRun = useCallback(() => {
+    if (pollRef.current) return;
+    pollRef.current = setInterval(() => {
+      fetch('/api/runs/current')
+        .then((response) => response.json())
+        .then((data) => {
+          if (data && data.run) {
+            // Run detected — stop polling and connect SSE
+            if (pollRef.current) {
+              clearInterval(pollRef.current);
+              pollRef.current = null;
+            }
+            setSnapshot(data as RunSnapshot);
+            lastSequence.current = (data as RunSnapshot).lastSequence || 0;
+            setError(null);
+            connectSSE();
+          }
+        })
+        .catch(() => {
+          setError('Waiting for AgentFlow server...');
+        });
+    }, 1000);
+  }, [connectSSE]);
+
+  useEffect(() => {
+    // Try snapshot immediately
+    fetch('/api/runs/current')
+      .then((response) => response.json())
+      .then((data) => {
+        if (data && data.run) {
+          setSnapshot(data as RunSnapshot);
+          lastSequence.current = (data as RunSnapshot).lastSequence || 0;
+          connectSSE();
+        } else {
+          // No run yet — start polling 1s
+          pollForRun();
+        }
+      })
+      .catch(() => {
+        pollForRun();
+      });
+
     return () => {
-      source.close();
-      setConnected(false);
+      mountedRef.current = false;
+      pollRef.current && clearInterval(pollRef.current);
+      reconnectRef.current && clearTimeout(reconnectRef.current);
+      sseRef.current?.close();
     };
   }, []);
 

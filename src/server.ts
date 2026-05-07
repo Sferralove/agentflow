@@ -221,18 +221,36 @@ async function handleRequest(req: Request): Promise<Response> {
   if (url.pathname === '/api/stream') {
     const runParam = url.searchParams.get('run')
     if (runParam) {
-      const snapshot = traceProjector.getSnapshot()
-      const runId = runParam === 'current' ? snapshot?.run.id : sanitizeSessionId(runParam)
-      if (!runId) return new Response('No active run', { status: 404, headers: corsHeaders })
       const after = parseInt(url.searchParams.get('after') || '0', 10)
+      const resolvedRunId = runParam === 'current' ? null : sanitizeSessionId(runParam)
+      if (runParam !== 'current' && !resolvedRunId) {
+        return new Response('Invalid run param', { status: 400, headers: corsHeaders })
+      }
 
       const stream = new ReadableStream({
         start(controller) {
-          sseHub.addClient(runId, controller)
-          sseHub.replay(runId, Number.isFinite(after) ? after : 0, controller)
+          let pollTimer: ReturnType<typeof setInterval> | null = null
+
+          const tryConnect = (): boolean => {
+            const snapshot = traceProjector.getSnapshot()
+            const runId = runParam === 'current' ? snapshot?.run.id : resolvedRunId
+            if (!runId) return false
+
+            sseHub.addClient(runId, controller)
+            sseHub.replay(runId, Number.isFinite(after) ? after : 0, controller)
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+            return true
+          }
+
+          if (!tryConnect() && runParam === 'current') {
+            // No run yet — poll until one appears
+            pollTimer = setInterval(tryConnect, 500)
+          }
         },
         cancel(controller) {
-          sseHub.removeClient(runId, controller)
+          const snapshot = traceProjector.getSnapshot()
+          const runId = runParam === 'current' ? snapshot?.run.id : resolvedRunId
+          if (runId) sseHub.removeClient(runId, controller)
         },
       })
 
