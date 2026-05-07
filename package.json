@@ -1,12 +1,12 @@
 {
   "name": "@sferralove/agentflow",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "description": "Live trace & observability for OpenCode agent workflows — plugin, server, and dashboard",
   "type": "module",
   "homepage": "https://github.com/Sferralove/agentflow",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Sferralove/agentflow"
+    "url": "git+https://github.com/Sferralove/agentflow.git"
   },
   "bugs": {
     "url": "https://github.com/Sferralove/agentflow/issues"
@@ -16,7 +16,7 @@
     ".": "./dist/index.js"
   },
   "bin": {
-    "agentflow": "./dist/cli.js"
+    "agentflow": "dist/cli.js"
   },
   "files": [
     "dist/",
