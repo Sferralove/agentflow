@@ -5,7 +5,7 @@
     <a href="https://www.npmjs.com/package/@sferralove/agentflow"><img src="https://img.shields.io/npm/v/@sferralove/agentflow?style=flat&label=npm&color=0891b2" alt="npm"></a>
     <a href="https://bun.sh"><img src="https://img.shields.io/badge/bun-%3E%3D1.2.0-0891b2?style=flat" alt="Bun"></a>
     <a href="https://github.com/Sferralove/agentflow/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-0891b2?style=flat" alt="MIT"></a>
-    <a href="#"><img src="https://img.shields.io/badge/build-passing-10b981?style=flat" alt="build"></a>
+    <a href="https://github.com/Sferralove/agentflow/actions"><img src="https://img.shields.io/badge/build-passing-10b981?style=flat" alt="build"></a>
   </p>
   <br>
 </div>
@@ -31,7 +31,7 @@ When running multi-agent OpenCode sessions, understanding what happened and why 
 
 - **⚡ Real-time capture** — Zero-dependency OpenCode plugin writes every tool event (task, bash, write, edit) to append-only JSONL files as they execute
 - **🔄 Live SSE streaming** — Two modes: raw event firehose by session, or typed `PatchEnvelope` events by run with sequence-based replay (`after=N`)
-- **🌳 Trace engine** — In-process pipeline normalises raw events into structured `RunSnapshot` records: a task tree (`TraceNode[]`), a chronological log (`TimelineItem[]`), and an agent dependency graph (`SessionGraph`)
+- **🌳 Trace engine** — In-process pipeline normalizes raw events into structured `RunSnapshot` records: a task tree (`TraceNode[]`), a chronological log (`TimelineItem[]`), and an agent dependency graph (`SessionGraph`)
 - **📊 Dashboard UI** — React 18 + ReactFlow + Tailwind with three panels: Work Trace (tree/graph toggle), Evidence Panel, and Timeline
 - **🧩 Critical path analysis** — Computes the longest-duration chain through the agent graph, highlighting bottlenecks
 - **🔌 Zero external dependencies** — Bun native HTTP, no Express, no Redis, no Postgres. Everything is file-based (JSONL + JSON snapshots)
@@ -45,7 +45,7 @@ When running multi-agent OpenCode sessions, understanding what happened and why 
 # Install
 npm install @sferralove/agentflow
 
-# Initialise — creates .agentflow/ + copies plugin to OpenCode
+# Initialize — creates .agentflow/ + copies plugin to OpenCode
 npx agentflow init
 
 # Build TypeScript + dashboard
@@ -62,7 +62,7 @@ With the plugin enabled in OpenCode, every agent session emits events that appea
 
 ### Requirements
 
-- **Bun** ≥ 1.2.0 (runtime — not Node.js compatible)
+- **Bun** ≥ 1.2.0 (required runtime — Node.js is not supported)
 - **OpenCode** ≥ 1.x (for plugin integration)
 - **npm** (for dashboard build)
 
@@ -89,7 +89,7 @@ With the plugin enabled in OpenCode, every agent session emits events that appea
                                                   │  ┌──────────────────┐  │
                                                   │  │  Trace Engine    │  │
                                                   │  │  ┌────────────┐  │  │
-                                                  │  │  │ Normaliser │  │  │
+                                                  │  │  │ Normalizer │  │  │
                                                   │  │  ├────────────┤  │  │
                                                   │  │  │ Projector  │  │  │
                                                   │  │  ├────────────┤  │  │
@@ -118,8 +118,8 @@ With the plugin enabled in OpenCode, every agent session emits events that appea
 
 | Layer | Responsibility |
 |-------|---------------|
-| **Event normaliser** | Classifies each raw `AgentEvent` into a semantic `NormalizedEventKind` (e.g. `delegation.started`, `command.executed`, `file.changed`) |
-| **Trace projector** | Incrementally builds a `RunSnapshot` — trace nodes, timeline items, and the agent graph — from the event stream. Deduplicates by event ID |
+| **Event normalizer** | Classifies each raw `AgentEvent` into a semantic `NormalizedEventKind` (e.g. `delegation.started`, `command.executed`, `file.changed`) |
+| **Trace projector** | Incrementally builds a `RunSnapshot` — trace nodes, timeline items, and the agent graph — from the event stream. Deduplication is handled by event ID |
 | **Run store** | Persists snapshots and patch history to `.agentflow/runs/{runId}/` as plain JSON/JSONL files |
 | **SSE hub** | Maintains an in-memory patch history per run and registers connected clients. Replays missed patches on connect via the `after=N` cursor |
 
@@ -131,7 +131,7 @@ All four layers run in-process with zero additional dependencies. Persistence is
 
 | Command | Description |
 |---------|-------------|
-| `agentflow init` | Initialise `.agentflow/` directories and copy the OpenCode plugin |
+| `agentflow init` | Initialize `.agentflow/` directories and copy the OpenCode plugin |
 | `agentflow serve [port]` | Start the Bun HTTP server (default: 3001) |
 | `agentflow stop` | Gracefully stop the running server via PID file |
 | `agentflow status` | Check if the server is running or stopped |
@@ -233,7 +233,7 @@ npx agentflow serve 3001
 
 ```bash
 npm run build          # TypeScript + dashboard (order matters)
-npm test               # Full test suite (bun:test, 44+ tests)
+npm test               # Full test suite (bun:test)
 npx tsc --noEmit       # TypeScript check only
 ```
 
@@ -242,7 +242,7 @@ npx tsc --noEmit       # TypeScript check only
 ```
 src/
   cli.ts, plugin.ts, server.ts, types.ts, index.ts
-  trace/             # Trace engine (normaliser, projector, graph builder)
+  trace/             # Trace engine (normalizer, projector, graph builder)
   run/               # Persistence (run store)
   stream/            # SSE delivery (hub)
 dashboard/
