@@ -5,7 +5,7 @@ import type { PatchEnvelope, Run, RunSnapshot } from '../trace/traceTypes.js'
 export function createRunStore(root: string = '.agentflow') {
   const runsDir = join(root, 'runs')
   const indexesDir = join(root, 'indexes')
-  const activeRunPath = join(indexesDir, 'active-run.json')
+  const activeRunPath = join(root, 'active-run.json')
 
   function ensureBaseDirs() {
     mkdirSync(root, { recursive: true })
@@ -19,6 +19,10 @@ export function createRunStore(root: string = '.agentflow') {
 
   function snapshotPath(runId: string) {
     return join(runDir(runId), 'snapshot.json')
+  }
+
+  function runPath(runId: string) {
+    return join(runDir(runId), 'run.json')
   }
 
   function patchesPath(runId: string) {
@@ -54,6 +58,7 @@ export function createRunStore(root: string = '.agentflow') {
     async writeSnapshot(snapshot: RunSnapshot): Promise<void> {
       ensureRunDir(snapshot.run.id)
       await writePrettyJson(snapshotPath(snapshot.run.id), snapshot)
+      await writePrettyJson(runPath(snapshot.run.id), snapshot.run)
     },
 
     async readSnapshot(runId: string): Promise<RunSnapshot | null> {

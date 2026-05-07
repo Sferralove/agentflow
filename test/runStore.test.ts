@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { expect, test } from 'bun:test'
 import { createRunStore } from '../src/run/runStore.js'
 import { emptyRunSnapshot } from '../src/trace/traceTypes.js'
@@ -36,7 +36,12 @@ test('writes and reads active run snapshot and patches', async () => {
   ])
 
   expect(await store.readActiveRun()).toEqual(snapshot.run)
+  expect(existsSync(`${root}/active-run.json`)).toBe(true)
+  expect(existsSync(`${root}/indexes/active-run.json`)).toBe(false)
   expect((await store.readSnapshot('run_1'))?.run.id).toBe('run_1')
+  expect(existsSync(`${root}/runs/run_1/snapshot.json`)).toBe(true)
+  expect(existsSync(`${root}/runs/run_1/run.json`)).toBe(true)
+  expect(JSON.parse(readFileSync(`${root}/runs/run_1/run.json`, 'utf8')).id).toBe('run_1')
   expect(await store.readPatchesAfter('run_1', 0)).toHaveLength(1)
   expect(await store.readPatchesAfter('run_1', 1)).toHaveLength(0)
 })
