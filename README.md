@@ -27,6 +27,14 @@ When running multi-agent OpenCode sessions, understanding what happened and why 
 
 ---
 
+<p align="center">
+  <img src="media/dashboard-screenshot.png" alt="AgentFlow Dashboard — Work Trace, Evidence Panel, and Timeline" width="800">
+  <br>
+  <em>AgentFlow dashboard: hierarchical task tree, evidence inspection panel, and chronological timeline.</em>
+</p>
+
+<br>
+
 ## Features
 
 - **⚡ Real-time capture** — Zero-dependency OpenCode plugin writes every tool event (task, bash, write, edit) to append-only JSONL files as they execute
