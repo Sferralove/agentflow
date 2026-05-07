@@ -64,27 +64,57 @@ function inferKind(raw: AgentEvent): NormalizedEventKind {
 
 function buildPayload(raw: AgentEvent): Record<string, unknown> {
   const input = raw.input ?? {}
-
-  return {
+  const payload: Record<string, unknown> = {
     title: getTitle(raw, input),
     tool: raw.tool,
-    input: raw.input,
-    output: raw.output,
-    error: raw.error,
-    duration: raw.duration,
-    command: input.command,
-    filePath: input.filePath,
-    subagentType: input.subagent_type,
+  }
+
+  if (raw.input !== undefined) {
+    payload.input = raw.input
+  }
+
+  if (raw.output !== undefined) {
+    payload.output = raw.output
+  }
+
+  if (raw.error !== undefined) {
+    payload.error = raw.error
+  }
+
+  if (raw.duration !== undefined) {
+    payload.duration = raw.duration
+  }
+
+  addStringPayloadField(payload, 'command', input.command)
+  addStringPayloadField(payload, 'filePath', input.filePath)
+  addStringPayloadField(payload, 'subagentType', input.subagent_type)
+
+  return payload
+}
+
+function addStringPayloadField(
+  payload: Record<string, unknown>,
+  key: string,
+  value: unknown,
+): void {
+  if (isNonEmptyString(value)) {
+    payload[key] = value
   }
 }
 
-function getTitle(raw: AgentEvent, input: Record<string, unknown>): unknown {
-  return (
-    input.description ??
-    input.command ??
-    input.filePath ??
-    input.subagent_type ??
-    raw.tool ??
-    raw.type
-  )
+function getTitle(raw: AgentEvent, input: Record<string, unknown>): string {
+  const candidates = [
+    input.description,
+    input.command,
+    input.filePath,
+    input.subagent_type,
+    raw.tool,
+    raw.type,
+  ]
+
+  return candidates.find(isNonEmptyString) ?? raw.type
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0
 }

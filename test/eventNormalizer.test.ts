@@ -80,3 +80,43 @@ test('normalizes session error as error detected', () => {
   expect(normalized.kind).toBe('error.detected')
   expect(normalized.payload.error).toBe('failed')
 })
+
+test('uses the first non-empty string title candidate', () => {
+  const normalized = normalizeAgentEvent({
+    raw: event({
+      id: 'generic_1',
+      type: 'tool.start',
+      tool: 'grep',
+      input: { description: 42, command: '', filePath: null, subagent_type: false },
+    }),
+    runId: 'run_1',
+    sequence: 8,
+  })
+
+  expect(typeof normalized.payload.title).toBe('string')
+  expect(normalized.payload.title).toBe('grep')
+})
+
+test('normalizes generic tool events', () => {
+  const start = normalizeAgentEvent({
+    raw: event({
+      id: 'tool_start_1',
+      type: 'tool.start',
+      tool: 'search',
+    }),
+    runId: 'run_1',
+    sequence: 9,
+  })
+  const end = normalizeAgentEvent({
+    raw: event({
+      id: 'tool_end_1',
+      type: 'tool.end',
+      tool: 'search',
+    }),
+    runId: 'run_1',
+    sequence: 10,
+  })
+
+  expect(start.kind).toBe('tool.started')
+  expect(end.kind).toBe('tool.completed')
+})
