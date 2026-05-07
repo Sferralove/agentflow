@@ -86,3 +86,28 @@ test('removeClient stops later publishes from enqueueing', () => {
 
   expect(chunks).toEqual([])
 })
+
+test('publish stores a copy so caller mutations cannot change history', () => {
+  const hub = createSseHub()
+  const publishedPatch = patch(1)
+
+  hub.publish([publishedPatch])
+  const payload = publishedPatch.payload as { status: string }
+  payload.status = 'completed'
+
+  expect(hub.getPatchesAfter('run_1', 0)[0]?.payload).toEqual({ status: 'running' })
+})
+
+test('getPatchesAfter returns copies so result mutations cannot change history', () => {
+  const hub = createSseHub()
+
+  hub.publish([patch(1)])
+  const returnedPatch = hub.getPatchesAfter('run_1', 0)[0]
+  if (!returnedPatch) {
+    throw new Error('expected stored patch')
+  }
+  const payload = returnedPatch.payload as { status: string }
+  payload.status = 'completed'
+
+  expect(hub.getPatchesAfter('run_1', 0)[0]?.payload).toEqual({ status: 'running' })
+})

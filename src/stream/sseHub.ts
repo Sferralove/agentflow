@@ -12,12 +12,18 @@ function enqueuePatch(controller: ReadableStreamDefaultController, patch: PatchE
   }
 }
 
+function clonePatch(patch: PatchEnvelope): PatchEnvelope {
+  return structuredClone(patch)
+}
+
 export function createSseHub() {
   const historyByRunId = new Map<string, PatchEnvelope[]>()
   const clientsByRunId = new Map<string, Set<ReadableStreamDefaultController>>()
 
   function getPatchesAfter(runId: string, after: number): PatchEnvelope[] {
-    return (historyByRunId.get(runId) ?? []).filter((patch) => patch.sequence > after)
+    return (historyByRunId.get(runId) ?? [])
+      .filter((patch) => patch.sequence > after)
+      .map(clonePatch)
   }
 
   function replay(
@@ -51,11 +57,12 @@ export function createSseHub() {
 
     publish(patches: PatchEnvelope[]): void {
       for (const patch of patches) {
+        const storedPatch = clonePatch(patch)
         const history = historyByRunId.get(patch.runId) ?? []
-        history.push(patch)
-        historyByRunId.set(patch.runId, history)
+        history.push(storedPatch)
+        historyByRunId.set(storedPatch.runId, history)
 
-        for (const controller of clientsByRunId.get(patch.runId) ?? []) {
+        for (const controller of clientsByRunId.get(storedPatch.runId) ?? []) {
           enqueuePatch(controller, patch)
         }
       }
