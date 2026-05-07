@@ -5,6 +5,9 @@
 import type { Server } from 'bun'
 import type { AgentEvent, SessionGraph } from './types.js'
 import { applyEventToGraph, buildGraphFromEvents } from './trace/graphProjector.js'
+import { createTraceProjector } from './trace/traceProjector.js'
+import { createRunStore } from './run/runStore.js'
+import { createSseHub } from './stream/sseHub.js'
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
 
 export { applyEventToGraph, buildGraphFromEvents } from './trace/graphProjector.js'
@@ -17,6 +20,11 @@ const DASHBOARD_DIR = new URL('../dashboard/dist', import.meta.url).pathname
 const graphs = new Map<string, SessionGraph>()
 // Active SSE clients: sessionId → Set<ReadableStreamController>
 const clients = new Map<string, Set<ReadableStreamDefaultController>>()
+
+// Trace engine
+const traceProjector = createTraceProjector()
+const runStore = createRunStore('.agentflow')
+const sseHub = createSseHub()
 
 // ─── Event Processing ───
 
@@ -145,6 +153,12 @@ function startWatching(): void {
               const evt: AgentEvent = JSON.parse(line)
               processEvent(evt)
               broadcast(sessionId, line)
+
+              const projection = traceProjector.applyRawEvent(evt)
+              runStore.writeActiveRun(projection.snapshot.run).catch(() => {})
+              runStore.writeSnapshot(projection.snapshot).catch(() => {})
+              runStore.appendPatches(projection.patches).catch(() => {})
+              sseHub.publish(projection.patches)
             } catch { /* skip malformed */ }
           }
         } catch { /* file read error */ }
@@ -173,8 +187,65 @@ async function handleRequest(req: Request): Promise<Response> {
     })
   }
 
+  // Run-first APIs
+  if (url.pathname === '/api/runs/current') {
+    const snapshot = traceProjector.getSnapshot()
+    if (!snapshot) {
+      return new Response(JSON.stringify({ run: null }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      })
+    }
+    return new Response(JSON.stringify(snapshot), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    })
+  }
+
+  if (url.pathname.startsWith('/api/runs/') && url.pathname.endsWith('/snapshot')) {
+    const runId = sanitizeSessionId(url.pathname.replace('/api/runs/', '').replace('/snapshot', ''))
+    const snapshot = await runStore.readSnapshot(runId)
+    return new Response(JSON.stringify(snapshot || { run: null }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    })
+  }
+
+  if (url.pathname === '/api/runs') {
+    const snapshot = traceProjector.getSnapshot()
+    return new Response(JSON.stringify({
+      runs: snapshot ? [snapshot.run] : [],
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    })
+  }
+
   // SSE stream endpoint
   if (url.pathname === '/api/stream') {
+    const runParam = url.searchParams.get('run')
+    if (runParam) {
+      const snapshot = traceProjector.getSnapshot()
+      const runId = runParam === 'current' ? snapshot?.run.id : sanitizeSessionId(runParam)
+      if (!runId) return new Response('No active run', { status: 404, headers: corsHeaders })
+      const after = parseInt(url.searchParams.get('after') || '0', 10)
+
+      const stream = new ReadableStream({
+        start(controller) {
+          sseHub.addClient(runId, controller)
+          sseHub.replay(runId, Number.isFinite(after) ? after : 0, controller)
+        },
+        cancel(controller) {
+          sseHub.removeClient(runId, controller)
+        },
+      })
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+          ...corsHeaders,
+        },
+      })
+    }
+
     const raw = url.searchParams.get('session')
     if (!raw) return new Response('Missing session param', { status: 400, headers: corsHeaders })
     const sessionId = sanitizeSessionId(raw)

@@ -1,5 +1,6 @@
 // test/smoke.test.ts
 import { describe, test, expect } from 'bun:test'
+import { createTraceProjector } from '../src/trace/traceProjector.js'
 
 test('server module exports startServer and stopServer', async () => {
   const { startServer, stopServer } = await import('../src/server.js')
@@ -63,4 +64,23 @@ test('server CORS on OPTIONS preflight', async () => {
   } finally {
     stopServer()
   }
+})
+
+test('run snapshot supports run-first API shape', () => {
+  const projector = createTraceProjector()
+  const result = projector.applyRawEvent({
+    id: 'evt_1',
+    type: 'tool.end',
+    sessionId: 'session_1',
+    timestamp: 100,
+    agent: 'builder',
+    tool: 'bash',
+    duration: 20,
+    error: null as unknown,
+  } as any)
+
+  expect(result.snapshot.run.id).toBe('run_session_1')
+  expect(result.snapshot.lastSequence).toBeGreaterThan(0)
+  expect(result.snapshot.traceNodes.length).toBeGreaterThan(0)
+  expect(result.snapshot.timelineItems.length).toBeGreaterThan(0)
 })
