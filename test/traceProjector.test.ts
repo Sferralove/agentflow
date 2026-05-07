@@ -85,3 +85,66 @@ test('deduplicates against raw event ids from the initial snapshot', () => {
   expect(result.snapshot.rawEvents).toHaveLength(1)
   expect(result.snapshot.lastSequence).toBe(3)
 })
+
+test('emits immutable patch payloads', () => {
+  const projector = createTraceProjector()
+  const first = projector.applyRawEvent(event({
+    id: 'first',
+    timestamp: 100,
+    type: 'tool.end',
+    tool: 'bash',
+  }))
+  const runPatch = first.patches.find((patch) => patch.type === 'run.updated')
+
+  projector.applyRawEvent(event({
+    id: 'idle',
+    timestamp: 200,
+    type: 'session.idle',
+  }))
+
+  expect(runPatch?.payload).toMatchObject({
+    status: 'running',
+    lastSeenAt: 100,
+  })
+})
+
+test('isolates returned snapshots from projector internals', () => {
+  const projector = createTraceProjector()
+  const result = projector.applyRawEvent(event({
+    id: 'bash_done',
+    type: 'tool.end',
+    tool: 'bash',
+  }))
+
+  result.snapshot.run.status = 'error'
+  result.snapshot.rawEvents.length = 0
+
+  const snapshot = projector.getSnapshot()
+
+  expect(snapshot?.run.status).toBe('running')
+  expect(snapshot?.rawEvents).toHaveLength(1)
+})
+
+test('uses raw event ids for timeline event ids', () => {
+  const projector = createTraceProjector()
+  const result = projector.applyRawEvent(event({
+    id: 'bash_done',
+    type: 'tool.end',
+    tool: 'bash',
+  }))
+
+  expect(result.snapshot.timelineItems[0].eventId).toBe('bash_done')
+})
+
+test('ignores malformed task delegation input in graph projection', () => {
+  const projector = createTraceProjector()
+
+  expect(() => projector.applyRawEvent(event({
+    id: 'bad_delegate',
+    type: 'tool.start',
+    tool: 'task',
+    input: { subagent_type: 42, description: 'Bad' },
+  }))).not.toThrow()
+
+  expect(projector.getSnapshot()?.graph.nodes.some((node) => node.id === '42')).toBe(false)
+})

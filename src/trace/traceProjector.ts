@@ -26,12 +26,12 @@ export function createTraceProjector(initial?: RunSnapshot): TraceProjector {
 
   return {
     getSnapshot(): RunSnapshot | null {
-      return snapshot
+      return snapshot ? cloneSnapshot(snapshot) : null
     },
     applyRawEvent(raw: AgentEvent): ProjectionResult {
       if (seenRawIds.has(raw.id)) {
         return {
-          snapshot: requireSnapshot(snapshot, raw),
+          snapshot: cloneSnapshot(requireSnapshot(snapshot, raw)),
           patches: [],
         }
       }
@@ -41,6 +41,7 @@ export function createTraceProjector(initial?: RunSnapshot): TraceProjector {
       }
 
       seenRawIds.add(raw.id)
+      const rawEvent = clonePayload(raw)
 
       const patches: PatchEnvelope[] = []
       const emit = <T>(type: PatchEnvelope<T>['type'], payload: T): void => {
@@ -49,35 +50,35 @@ export function createTraceProjector(initial?: RunSnapshot): TraceProjector {
           id: `patch_${snapshot!.lastSequence}`,
           runId: snapshot!.run.id,
           sequence: snapshot!.lastSequence,
-          emittedAt: raw.timestamp,
+          emittedAt: rawEvent.timestamp,
           type,
-          payload,
+          payload: clonePayload(payload),
         }))
       }
 
       const graphBefore = snapshotGraphState(snapshot.graph)
-      snapshot.rawEvents.push(raw)
-      emit('raw.event', raw)
+      snapshot.rawEvents.push(rawEvent)
+      emit('raw.event', rawEvent)
 
       const normalized = normalizeAgentEvent({
-        raw,
+        raw: rawEvent,
         runId: snapshot.run.id,
         sequence: snapshot.lastSequence + 1,
       })
       snapshot.normalizedEvents.push(normalized)
 
-      const node = buildTraceNode(snapshot.run.id, raw)
+      const node = buildTraceNode(snapshot.run.id, rawEvent)
       upsertTraceNode(snapshot.traceNodes, node)
       emit('trace.node.upserted', node)
 
-      const timelineItem = buildTimelineItem(snapshot.run.id, normalized.id, raw, normalized.kind, node)
+      const timelineItem = buildTimelineItem(snapshot.run.id, rawEvent, normalized.kind, node)
       upsertTimelineItem(snapshot.timelineItems, timelineItem)
       emit('timeline.item.upserted', timelineItem)
 
-      updateRun(snapshot.run, raw)
+      updateRun(snapshot.run, rawEvent)
       emit('run.updated', snapshot.run)
 
-      applyEventToGraph(snapshot.graph, raw)
+      applyEventToGraph(snapshot.graph, rawEvent)
       for (const node of changedGraphNodes(graphBefore, snapshot.graph)) {
         emit('graph.node.upserted', node)
       }
@@ -85,7 +86,7 @@ export function createTraceProjector(initial?: RunSnapshot): TraceProjector {
         emit('graph.edge.upserted', edge)
       }
 
-      return { snapshot, patches }
+      return { snapshot: cloneSnapshot(snapshot), patches }
     },
   }
 }
@@ -152,7 +153,6 @@ function inferTraceStatus(raw: AgentEvent): TraceStatus {
 
 function buildTimelineItem(
   runId: string,
-  eventId: string,
   raw: AgentEvent,
   kind: TimelineItem['kind'],
   node: TraceNode,
@@ -161,7 +161,7 @@ function buildTimelineItem(
     id: `timeline_${raw.id}`,
     runId,
     traceNodeId: node.id,
-    eventId,
+    eventId: raw.id,
     timestamp: raw.timestamp,
     title: node.title,
     kind,
@@ -222,28 +222,11 @@ function changedGraphEdges(before: Map<string, string>, graph: SessionGraph): Se
 }
 
 function cloneSnapshot(snapshot: RunSnapshot): RunSnapshot {
-  return {
-    run: { ...snapshot.run },
-    lastSequence: snapshot.lastSequence,
-    rawEvents: snapshot.rawEvents.map((event) => ({ ...event, input: event.input ? { ...event.input } : undefined })),
-    normalizedEvents: snapshot.normalizedEvents.map((event) => ({
-      ...event,
-      payload: { ...event.payload },
-      raw: { ...event.raw, input: event.raw.input ? { ...event.raw.input } : undefined },
-    })),
-    traceNodes: snapshot.traceNodes.map((node) => ({
-      ...node,
-      sourceEventIds: [...node.sourceEventIds],
-    })),
-    timelineItems: snapshot.timelineItems.map((item) => ({
-      ...item,
-      sourceEventIds: [...item.sourceEventIds],
-    })),
-    graph: {
-      nodes: snapshot.graph.nodes.map((node) => ({ ...node })),
-      edges: snapshot.graph.edges.map((edge) => ({ ...edge })),
-    },
-  }
+  return clonePayload(snapshot)
+}
+
+function clonePayload<T>(payload: T): T {
+  return structuredClone(payload) as T
 }
 
 function requireSnapshot(snapshot: RunSnapshot | null, raw: AgentEvent): RunSnapshot {

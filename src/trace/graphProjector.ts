@@ -53,9 +53,9 @@ function updateNodeStatus(graph: SessionGraph, id: string, status: AgentNode['st
 
 export function applyEventToGraph(graph: SessionGraph, evt: AgentEvent): void {
   if (evt.type === 'tool.start' && evt.tool === 'task' && evt.input) {
-    const subagent = evt.input.subagent_type as string
-    const description = (evt.input.description as string) || 'delegated task'
-    if (!subagent) return
+    const subagent = evt.input.subagent_type
+    const description = evt.input.description
+    if (!isNonEmptyString(subagent)) return
 
     ensureNode(graph, evt.agent, 'main', undefined, evt.sessionId, evt.timestamp)
     updateNodeStatus(graph, evt.agent, 'running', evt.timestamp)
@@ -67,7 +67,7 @@ export function applyEventToGraph(graph: SessionGraph, evt: AgentEvent): void {
         id: evt.id,
         source: evt.agent,
         target: subagent,
-        description,
+        description: isNonEmptyString(description) ? description : 'delegated task',
       })
     }
     return
@@ -123,4 +123,8 @@ export function buildGraphFromEvents(events: AgentEvent[]): SessionGraph {
     applyEventToGraph(graph, evt)
   }
   return graph
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0
 }
