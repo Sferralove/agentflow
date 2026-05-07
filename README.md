@@ -70,46 +70,6 @@ With the plugin enabled in OpenCode, every agent session emits events that appea
 
 ## Architecture
 
-```
-┌──────────────┐     tool.execute.before/after      ┌──────────────────────┐
-│  OpenCode    │ ────────────────────────────────▶   │   AgentFlow Plugin   │
-│  Agent       │     event: session.*                │   (FileSink writer)  │
-└──────────────┘                                     └──────────┬───────────┘
-                                                               │ JSONL
-                                                               ▼
-                                                  ┌────────────────────────┐
-                                                  │  .agentflow/sessions/  │
-                                                  │  {session_id}.jsonl    │
-                                                  └───────────┬────────────┘
-                                                              │ poll 500ms
-                                                              ▼
-                                                  ┌────────────────────────┐
-                                                  │    Bun HTTP Server     │
-                                                  │                        │
-                                                  │  ┌──────────────────┐  │
-                                                  │  │  Trace Engine    │  │
-                                                  │  │  ┌────────────┐  │  │
-                                                  │  │  │ Normalizer │  │  │
-                                                  │  │  ├────────────┤  │  │
-                                                  │  │  │ Projector  │  │  │
-                                                  │  │  ├────────────┤  │  │
-                                                  │  │  │ Store      │  │  │
-                                                  │  │  ├────────────┤  │  │
-                                                  │  │  │ SSE Hub    │  │  │
-                                                  │  │  └────────────┘  │  │
-                                                  │  └──────────────────┘  │
-                                                  └───────────┬────────────┘
-                                                              │ EventSource
-                                                              ▼
-                                                  ┌────────────────────────┐
-                                                  │   React Dashboard     │
-                                                  │  Task Tree · Timeline  │
-                                                  │  Graph · Evidence     │
-                                                  └────────────────────────┘
-```
-
-### Trace engine pipeline
-
 <p align="center">
   <img src="media/dashboard-screenshot.png" alt="AgentFlow Dashboard — Work Trace, Evidence Panel, and Timeline" width="800">
   <br>
